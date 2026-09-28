@@ -18,6 +18,7 @@ def _now() -> datetime:
 # --- auth (PIN gate) ---
 class UnlockIn(BaseModel):
     pin: str
+    device_id: str | None = None
 
 
 class MeOut(BaseModel):
@@ -34,7 +35,7 @@ class Profile(BaseModel):
     name: str = "UPSC Aspirant"
     target_exam: str = "UPSC Civil Services Examination 2027"
     optional_subject: str = ""
-    daily_target_minutes: int = 480
+    daily_target_minutes: int = 600  # 10h mandatory daily target
 
 
 class ProfileUpdate(BaseModel):
@@ -224,18 +225,225 @@ class InsightsOut(BaseModel):
     syllabus_progress_pct: float
 
 
+# --- pyq bank ---
+class PyqQuestion(BaseModel):
+    id: str
+    year: int
+    qnum: int
+    subject: str
+    subtopic: str = ""
+    difficulty: str = "moderate"
+    format: str = "Single-answer"
+    statement_count: int = 0
+    negative_stem: bool = False
+    current_affairs: bool = False
+    answer: str = ""
+    cancelled: bool = False
+
+
+class PyqMeta(BaseModel):
+    total: int
+    years: list[int]
+    subjects: list[str]
+    per_year: dict[str, int]
+    per_subject: dict[str, int]
+    difficulties: list[str]
+
+
+class PyqResultItem(BaseModel):
+    question_id: str
+    year: int
+    qnum: int
+    subject: str
+    subtopic: str = ""
+    marked: str = ""
+    correct_answer: str = ""
+    is_correct: bool = False
+
+
+class PyqAttempt(BaseModel):
+    id: str = Field(default_factory=_uuid)
+    label: str
+    year: int | None = None
+    subject: str | None = None
+    total: int
+    correct: int
+    wrong: int
+    skipped: int
+    score: float
+    max_score: float
+    accuracy: float
+    date: str
+    items: list[PyqResultItem] = Field(default_factory=list)
+    weak_topics: list[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=_now)
+
+
+class PyqAttemptCreate(BaseModel):
+    label: str | None = None
+    year: int | None = None
+    subject: str | None = None
+    answers: dict[str, str]  # question_id -> a|b|c|d ("" = skipped)
+
+
+# --- analytics ---
+class WeaknessItem(BaseModel):
+    topic: str
+    subject: str = ""
+    mock_hits: int = 0
+    pyq_wrong: int = 0
+    severity: int = 0
+    in_revision_queue: bool = False
+
+
+class WeaknessOut(BaseModel):
+    items: list[WeaknessItem]
+    total_topics: int
+    critical: int
+    not_queued: int
+
+
+class HeatCell(BaseModel):
+    date: str
+    minutes: int
+    weekday: int
+    week: int
+
+
+class BurnDownPoint(BaseModel):
+    date: str
+    remaining: int
+    ideal: int
+
+
+class ForecastOut(BaseModel):
+    days_to_prelims: int
+    avg_daily_minutes: int
+    daily_target_minutes: int
+    target_gap_minutes: int
+    topics_remaining: int
+    topics_per_week: float
+    weeks_needed: float | None = None
+    weeks_left: float
+    on_track: bool
+    projected_hours_to_exam: int
+
+
+# --- professor ai ---
+class AiChatIn(BaseModel):
+    message: str
+    session_id: str | None = None
+
+
+class AiChatOut(BaseModel):
+    session_id: str
+    reply: str
+    provider: str
+    actions: list[str] = Field(default_factory=list)
+
+
+class AiMessage(BaseModel):
+    id: str = Field(default_factory=_uuid)
+    session_id: str
+    role: str  # user | assistant
+    content: str
+    provider: str = ""
+    actions: list[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=_now)
+
+
+class AiSession(BaseModel):
+    id: str
+    title: str = ""
+    provider: str = ""
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)
+
+
+class OmrResultOut(BaseModel):
+    label: str
+    provider: str
+    detected: dict[str, str] = Field(default_factory=dict)
+    detected_count: int = 0
+    evaluated: bool = False
+    correct: int = 0
+    wrong: int = 0
+    blank: int = 0
+    score: float = 0.0
+    max_score: float = 0.0
+    accuracy: float = 0.0
+    notes: str = ""
+    date: str
+
+
+# --- devices ---
+class DeviceOut(BaseModel):
+    id: str
+    label: str
+    user_agent: str = ""
+    approved: bool = False
+    current: bool = False
+    last_seen: datetime = Field(default_factory=_now)
+    created_at: datetime = Field(default_factory=_now)
+
+
+class DeviceUpdate(BaseModel):
+    approved: bool
+
+
 # --- notion sync ---
 class NotionStatus(BaseModel):
     configured: bool
     token_hint: str | None = None
     database_id: str | None = None
+    database_title: str | None = None
     last_synced_at: datetime | None = None
+    cached_entries: int = 0
+    unread_entries: int = 0
 
 
 class NotionTestOut(BaseModel):
     ok: bool
     message: str
     database_title: str | None = None
+    database_id: str | None = None
+
+
+class NotionSchemaOut(BaseModel):
+    database_id: str
+    title: str
+    options: dict[str, list[str]]
+    property_types: dict[str, str]
+
+
+class NotionEntry(BaseModel):
+    page_id: str
+    title: str
+    url: str = ""
+    status: str = ""
+    unread: bool = True
+    place_type: str = ""
+    priority: str = ""
+    continents: list[str] = Field(default_factory=list)
+    issue_types: list[str] = Field(default_factory=list)
+    country_tags: list[str] = Field(default_factory=list)
+    months: list[str] = Field(default_factory=list)
+    source_link: str = ""
+    memory_aid: str = ""
+    pyq_history: str = ""
+    last_updated: str = ""
+    images: list[dict] = Field(default_factory=list)
+    last_edited_time: str = ""
+    values: dict = Field(default_factory=dict)
+
+
+class NotionEntryUpdate(BaseModel):
+    title: str | None = None
+    status: str | None = None
+    priority: str | None = None
+    memory_aid: str | None = None
+    pyq_history: str | None = None
+    unread: bool | None = None
 
 
 class NotionSyncOut(BaseModel):

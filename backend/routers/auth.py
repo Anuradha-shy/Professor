@@ -6,11 +6,11 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
-from pydantic import BaseModel
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, Response
+from pymongo import ReturnDocument
 
 from lib.db import db
-from models.tracker import MeOut, PinChangeIn, UnlockIn
+from models.tracker import DeviceOut, DeviceUpdate, MeOut, PinChangeIn, UnlockIn
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -48,11 +48,46 @@ async def require_auth(tracker_session: str | None = Cookie(default=None, alias=
         raise HTTPException(status_code=401, detail="Vault is locked")
 
 
+async def _check_device(device_id: str, user_agent: str) -> None:
+    """Device binding: the first device to unlock is trusted; others need approval."""
+    if not device_id:
+        return
+    known = await db.devices.find_one({"id": device_id})
+    now = datetime.now(timezone.utc)
+    if known:
+        if not known.get("approved"):
+            raise HTTPException(
+                status_code=403,
+                detail="This device is not approved. Approve it from Settings on your trusted device.",
+            )
+        await db.devices.update_one({"id": device_id}, {"$set": {"last_seen": now, "user_agent": user_agent}})
+        return
+    first = await db.devices.count_documents({}) == 0
+    await db.devices.insert_one(
+        {
+            "id": device_id,
+            "label": "This device" if first else "New device",
+            "user_agent": user_agent,
+            "approved": first,  # the very first device is trusted automatically
+            "last_seen": now,
+            "created_at": now,
+        }
+    )
+    if not first:
+        raise HTTPException(
+            status_code=403,
+            detail="New device detected. Approve it from Settings on your trusted device.",
+        )
+
+
 @router.post("/unlock", response_model=MeOut)
-async def unlock(input: UnlockIn, response: Response) -> MeOut:
+async def unlock(input: UnlockIn, response: Response, request: Request) -> MeOut:
     expected = await _active_pin_hash()
     if not hmac.compare_digest(_pin_hash(input.pin.strip()), expected):
         raise HTTPException(status_code=401, detail="Incorrect passcode")
+    await _check_device(
+        (input.device_id or "").strip(), request.headers.get("user-agent", "")[:200]
+    )
     response.set_cookie(
         COOKIE_NAME,
         create_token(),
@@ -81,9 +116,44 @@ async def change_pin(input: PinChangeIn, _: None = Depends(require_auth)) -> MeO
     if not hmac.compare_digest(_pin_hash(input.current_pin.strip()), expected):
         raise HTTPException(status_code=401, detail="Current passcode is incorrect")
     new_pin = input.new_pin.strip()
-    if not (new_pin.isdigit() and 4 <= len(new_pin) <= 8):
-        raise HTTPException(status_code=422, detail="New passcode must be 4-8 digits")
+    if not (new_pin.isalnum() and 4 <= len(new_pin) <= 32):
+        raise HTTPException(
+            status_code=422, detail="New passcode must be 4-32 letters or digits"
+        )
     await db.app_meta.update_one(
         {"key": "pin"}, {"$set": {"hash": _pin_hash(new_pin)}}, upsert=True
     )
     return MeOut(authenticated=True)
+
+
+@router.get("/devices", response_model=list[DeviceOut])
+async def list_devices(
+    _: None = Depends(require_auth),
+    x_device_id: str | None = Header(default=None, alias="X-Device-Id"),
+) -> list[DeviceOut]:
+    docs = await db.devices.find().sort([("created_at", 1)]).to_list(50)
+    return [
+        DeviceOut(**{k: v for k, v in d.items() if k != "_id"}, current=d["id"] == x_device_id)
+        for d in docs
+    ]
+
+
+@router.patch("/devices/{device_id}", response_model=DeviceOut)
+async def update_device(
+    device_id: str, input: DeviceUpdate, _: None = Depends(require_auth)
+) -> DeviceOut:
+    doc = await db.devices.find_one_and_update(
+        {"id": device_id},
+        {"$set": {"approved": input.approved}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Device not found")
+    return DeviceOut(**{k: v for k, v in doc.items() if k != "_id"})
+
+
+@router.delete("/devices/{device_id}", status_code=204)
+async def delete_device(device_id: str, _: None = Depends(require_auth)) -> None:
+    res = await db.devices.delete_one({"id": device_id})
+    if not res.deleted_count:
+        raise HTTPException(status_code=404, detail="Device not found")

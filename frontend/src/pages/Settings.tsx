@@ -26,9 +26,9 @@ import { CardShell, PageHeader } from "@/components/kit";
 import { apiPatch, apiPost } from "@/lib/api";
 import { errDetail, fmtDate, fmtMinutes } from "@/lib/format";
 import {
+  useDevices,
   useGoals,
   useNotionLogs,
-  useNotionMirror,
   useNotionStatus,
   useProfile,
   useRevisions,
@@ -36,7 +36,7 @@ import {
   useSubjects,
   useTests,
 } from "@/lib/queries";
-import type { NotionSyncOut, NotionTestOut, Profile } from "@/lib/types";
+import type { DeviceOut, NotionSyncOut, NotionTestOut, Profile } from "@/lib/types";
 import { endSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
@@ -50,7 +50,7 @@ export default function Settings() {
   const qc = useQueryClient();
   const notionStatus = useNotionStatus();
   const logs = useNotionLogs();
-  const mirror = useNotionMirror();
+  const devices = useDevices();
   const profile = useProfile();
   const subjects = useSubjects();
   const sessions = useSessions();
@@ -87,7 +87,7 @@ export default function Settings() {
   });
 
   const sync = useMutation({
-    mutationFn: () => apiPost<NotionSyncOut>("/notion/sync"),
+    mutationFn: () => apiPost<NotionSyncOut>("/notion/push-sessions"),
     onSuccess: (res) => {
       if (res.ok) toast.success(res.message);
       else toast.error(res.message);
@@ -113,6 +113,16 @@ export default function Settings() {
     onError: (error) => toast.error(errDetail(error)),
   });
 
+  const toggleDevice = useMutation({
+    mutationFn: ({ id, approved }: { id: string; approved: boolean }) =>
+      apiPatch<DeviceOut>(`/auth/devices/${id}`, { approved }),
+    onSuccess: (d) => {
+      toast.success(d.approved ? "Device approved" : "Device revoked");
+      qc.invalidateQueries({ queryKey: ["auth", "devices"] });
+    },
+    onError: (error) => toast.error(errDetail(error)),
+  });
+
   const changePin = useMutation({
     mutationFn: () => apiPost("/auth/pin", { current_pin: currentPin, new_pin: newPin }),
     onSuccess: () => {
@@ -125,7 +135,12 @@ export default function Settings() {
   });
 
   const st = notionStatus.data;
-  const pinValid = currentPin.length >= 4 && newPin.length >= 4 && newPin === newPin.trim() && /^\d+$/.test(newPin);
+  const pinValid =
+    currentPin.length >= 4 &&
+    newPin.length >= 4 &&
+    newPin.length <= 32 &&
+    newPin === newPin.trim() &&
+    /^[A-Za-z0-9]+$/.test(newPin);
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -196,13 +211,16 @@ export default function Settings() {
             </div>
             {!st?.configured ? (
               <p className="rounded-lg bg-[#FEF3E2] px-3 py-2 text-xs leading-relaxed text-[#8A3D04]" data-testid="notion-simulated-note">
-                Simulated mode: sync mirrors recent sessions into the local table below and logs the
-                run. Add <span className="font-mono font-semibold">NOTION_TOKEN</span> and{" "}
-                <span className="font-mono font-semibold">NOTION_DATABASE_ID</span> to{" "}
-                <span className="font-mono font-semibold">backend/.env</span> and restart the backend
-                to go live.
+                No token found. Add <span className="font-mono font-semibold">NOTION_TOKEN</span> to{" "}
+                <span className="font-mono font-semibold">backend/.env</span> and restart the backend.
               </p>
-            ) : null}
+            ) : (
+              <p className="rounded-lg bg-[#EDF5F0] px-3 py-2 text-xs leading-relaxed text-[#1D4532]" data-testid="notion-live-note">
+                Live sync is active. Browse, filter and edit every entry on the{" "}
+                <span className="font-semibold">Notion</span> page — edits write back to your
+                database in real time.
+              </p>
+            )}
             <details className="rounded-lg border border-[#F0EDE5] px-3 py-2 text-xs text-[#5E6258]" data-testid="notion-instructions">
               <summary className="cursor-pointer font-medium text-[#383A34]">How to connect (2 minutes)</summary>
               <ol className="mt-2 list-decimal space-y-1 pl-4">
@@ -262,35 +280,62 @@ export default function Settings() {
           </div>
         </div>
 
-        {(mirror.data ?? []).length > 0 ? (
-          <div className="mt-6">
-            <p className="mb-2 font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-[#8C6212]">
-              Mirrored rows (what your Notion database receives)
-            </p>
-            <div className="rounded-xl border border-[#E8E3D7]">
-              <Table data-testid="notion-mirror-table">
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="font-mono text-[11px] uppercase tracking-[0.14em]">Page title</TableHead>
-                    <TableHead className="w-24 font-mono text-[11px] uppercase tracking-[0.14em]">Subject</TableHead>
-                    <TableHead className="w-24 text-right font-mono text-[11px] uppercase tracking-[0.14em]">Hours</TableHead>
-                    <TableHead className="w-32 text-right font-mono text-[11px] uppercase tracking-[0.14em]">Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(mirror.data ?? []).slice(0, 8).map((m) => (
-                    <TableRow key={m.id} data-testid={`mirror-row-${m.id}`}>
-                      <TableCell className="text-sm text-[#1C1D18]">{m.title}</TableCell>
-                      <TableCell className="text-sm text-[#5E6258]">{m.subject}</TableCell>
-                      <TableCell className="text-right font-mono text-sm">{(m.minutes / 60).toFixed(2)}</TableCell>
-                      <TableCell className="text-right font-mono text-sm text-[#5E6258]">{m.date}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        ) : null}
+        <p className="mt-4 text-xs text-[#5E6258]" data-testid="notion-cache-line">
+          {st?.cached_entries ?? 0} entries mirrored · {st?.unread_entries ?? 0} unread
+        </p>
+      </CardShell>
+
+      {/* Trusted devices */}
+      <CardShell title="Trusted devices" overline="Device binding" testId="devices-card">
+        <p className="mb-3 text-sm text-[#5E6258]">
+          The first device to unlock is trusted automatically. Any other device is refused until you
+          approve it here — so nobody else can open your tracker even with the PIN.
+        </p>
+        <ul className="space-y-2" data-testid="devices-list">
+          {(devices.data ?? []).length === 0 ? (
+            <li className="rounded-lg border border-dashed border-[#E8E3D7] px-3 py-3 text-center text-xs text-[#8B8F83]">
+              No devices recorded yet.
+            </li>
+          ) : (
+            (devices.data ?? []).map((d: DeviceOut) => (
+              <li
+                key={d.id}
+                data-testid={`device-${d.id}`}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#F0EDE5] px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="flex items-center gap-2 text-sm font-medium text-[#1C1D18]">
+                    {d.label}
+                    {d.current ? (
+                      <Badge className="border-0 bg-[#EDF5F0] font-mono text-[10px] uppercase text-[#1D4532]">
+                        this device
+                      </Badge>
+                    ) : null}
+                  </p>
+                  <p className="truncate font-mono text-[11px] text-[#8B8F83]">{d.user_agent || d.id}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    className={cn(
+                      "border-0 font-mono text-[10px] uppercase tracking-[0.12em]",
+                      d.approved ? "bg-[#EDF5F0] text-[#1D4532]" : "bg-[#FEF3E2] text-[#8A3D04]",
+                    )}
+                  >
+                    {d.approved ? "approved" : "blocked"}
+                  </Badge>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    data-testid={`device-toggle-${d.id}`}
+                    onClick={() => toggleDevice.mutate({ id: d.id, approved: !d.approved })}
+                  >
+                    {d.approved ? "Revoke" : "Approve"}
+                  </Button>
+                </div>
+              </li>
+            ))
+          )}
+        </ul>
       </CardShell>
 
       {/* Profile */}
@@ -367,7 +412,7 @@ export default function Settings() {
             data-testid="change-pin-btn"
             onClick={() => setPinOpen(true)}
           >
-            <KeyRound className="size-4" /> Change passcode
+            <KeyRound className="size-4" /> Change password
           </Button>
           <Button
             variant="outline"
@@ -387,8 +432,10 @@ export default function Settings() {
       <Dialog open={pinOpen} onOpenChange={setPinOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="font-serif text-2xl">Change passcode</DialogTitle>
-            <DialogDescription>4–8 digits. You'll need it at the next unlock.</DialogDescription>
+            <DialogTitle className="font-serif text-2xl">Change password</DialogTitle>
+            <DialogDescription>
+              4–32 letters or digits. You'll need it at the next unlock.
+            </DialogDescription>
           </DialogHeader>
           <form
             data-testid="pin-form"
@@ -404,7 +451,6 @@ export default function Settings() {
                 id="pin-current"
                 data-testid="pin-current-input"
                 type="password"
-                inputMode="numeric"
                 value={currentPin}
                 onChange={(e) => setCurrentPin(e.target.value)}
               />
@@ -415,7 +461,6 @@ export default function Settings() {
                 id="pin-new"
                 data-testid="pin-new-input"
                 type="password"
-                inputMode="numeric"
                 value={newPin}
                 onChange={(e) => setNewPin(e.target.value)}
               />

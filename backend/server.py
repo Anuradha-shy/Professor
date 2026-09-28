@@ -18,11 +18,14 @@ load_dotenv(ROOT_DIR / '.env')
 # MongoDB connection
 from lib.db import client, db, ensure_indexes
 
+from routers.ai import router as ai_router
+from routers.analytics import router as analytics_router
 from routers.auth import router as auth_router
 from routers.goals import router as goals_router
 from routers.insights import router as insights_router
 from routers.notion import router as notion_router
 from routers.profile import router as profile_router
+from routers.pyq import router as pyq_router
 from routers.revisions import router as revisions_router
 from routers.sessions import router as sessions_router
 from routers.subjects import router as subjects_router
@@ -79,6 +82,9 @@ api_router.include_router(goals_router)
 api_router.include_router(revisions_router)
 api_router.include_router(tests_router)
 api_router.include_router(insights_router)
+api_router.include_router(analytics_router)
+api_router.include_router(pyq_router)
+api_router.include_router(ai_router)
 api_router.include_router(notion_router)
 
 # Include the router in the main app — keep this the LAST router statement

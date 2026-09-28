@@ -1,74 +1,62 @@
-# Ashoka Academy — UPSC CSE Personal Tracker (spec)
+# Professor 🥼 — private UPSC CSE 2027 tracker (spec)
 
-Premium personal study-tracking web app for a UPSC CSE 2027 aspirant — the legacy
-"Precision UPSC GS1 Portal" (static PWA / Cloudflare Workers) rebuilt as a modern
-FastAPI + React dashboard. Legacy elements preserved: Prelims **24 May 2027**
-countdown, subject-ledger study log, mock-test/OMR performance tracking.
+Rebuild of the legacy "Precision UPSC GS1 Portal" as a FastAPI + React app.
+Exam anchor: **Prelims 24 May 2027 (final attempt)**. Single user, device-bound.
 
 ## Stack
-- Backend: FastAPI (`backend/server.py`, single `api_router` at `/api`), motor + Mongo
-  (db `app`), Pydantic v2 models in `backend/models/tracker.py`, routers in
-  `backend/routers/` (auth, profile, subjects, sessions, goals, revisions, tests,
-  insights, notion). Indexes in `backend/lib/db.py` INDEXES, applied at startup.
-- Frontend: Vite + React 19 + TS strict, TanStack Query, shadcn/ui (base-nova),
-  recharts via `@/lib/recharts` alias. Warm editorial theme: ivory `#FBF9F4`,
-  ink `#1C1D18`, saffron `#C8640E`, forest `#1D3A2C`; Lora headings, DM Sans body,
-  JetBrains Mono metrics. Paper-stipple background + CSS-3D orbiting ring backdrop
-  (`components/Backdrop3D.tsx`, transparent, pointer-events-none).
+FastAPI (`server.py`, one `api_router` at `/api`) + motor/Mongo; Vite + React 19 +
+TS strict + TanStack Query + shadcn/ui. Theme: ivory `#FBF9F4`, ink `#1C1D18`,
+saffron `#C8640E`, forest `#1D3A2C`; Lora / DM Sans / JetBrains Mono. CSS-3D ring
+backdrop + paper stipple + glass panels; colour-coded nav per section.
 
-## Auth — PIN vault (no user accounts)
-- One shared passcode. `POST /api/auth/unlock {pin}` → httpOnly JWT cookie (30d,
-  HS256, APP_SECRET). Every tracker router depends on `require_auth`; 401 →
-  frontend `ProtectedLayout` redirects to `/login`.
-- Default PIN **1947** (`APP_PIN` in backend/.env). After a change (Settings →
-  POST /api/auth/pin) the hash lives in Mongo `app_meta` and overrides the env default.
-- Sign-out = "Lock" button → `endSession()` (POST /api/auth/logout + cache clear).
+## Auth
+Password vault (**ican**, alphanumeric 4–32 chars, hash in `app_meta`) → httpOnly
+JWT cookie. **Device binding**: first `device_id` to unlock is trusted; others get
+403 until approved in Settings → Trusted devices (`devices` collection).
+Frontend id: `lib/device.ts` (localStorage uuid, sent on unlock).
 
-## Data model (collections)
-- `subjects`: `{id, name, short_name, color, topics[{id,name,done}]}` — progress
-  computed on read (`SubjectOut`: total/completed/progress_pct). Seed ids: gs1, gs2,
-  gs3, gs4, optional (PSIR), csat.
-- `sessions`: `{id, subject_id, subject_name, topic, duration_minutes, date,
-  notes, created_at}` — POST defaults date to server-today.
-- `goals`: `{id, title, description, subject_id?, priority, target_date, progress,
-  status}` — progress 100 auto-sets status done.
-- `revisions`: `{id, topic, subject_id, subject_name, source, interval_days,
-  last_revised, next_due, review_count}` — `POST /revisions/{id}/review
-  {retention: easy|good|hard}` recomputes interval (easy ≈×2, good ≈×1.4, hard → 1d)
-  and next_due server-side (server-anchored dates via lib/dates.py).
-- `tests`: `{id, name, kind: prelims_gs|prelims_csat|mains|sectional, subject_id?,
-  score, max_score, accuracy, date, weak_topics[]}`.
-- `profile` (single doc): name, target_exam, optional_subject, daily_target_minutes.
-- `insights` (GET /api/insights, computed): today vs target, streak, week delta,
-  daily 14d points, 24h buckets, subject balance, revision_due, goal_active,
-  test stats, syllabus pct, **days_to_prelims** (fixed date 2027-05-24).
-- `app_meta` (pin hash), `notion_logs`, `notion_mirror` (sync artifacts).
+## Routers (all under /api)
+auth (unlock/me/logout/pin/devices) · profile · subjects · sessions · goals ·
+revisions · tests · insights · **analytics** (weakness/heatmap/burndown/forecast) ·
+**pyq** (meta/questions/attempts) · **ai** (chat/sessions/omr) · **notion**
+(status/test/schema/pull/entries/PATCH entry/logs/push-sessions).
 
-## Notion sync (backend/routers/notion.py)
-- **Simulated mode** (current): mirrors the 10 most recent un-synced sessions into
-  `notion_mirror` + writes `notion_logs`; clearly labelled in the UI.
-- **Live mode** activates the moment `NOTION_TOKEN` + `NOTION_DATABASE_ID` are set in
-  backend/.env and the backend restarts: sessions become real Notion pages
-  (Name/Hours/Date mapping, auto-fallback to title-only on schema mismatch,
-  page_id persisted to prevent duplicates). `POST /api/notion/test` pings the real
-  database; token never leaves the server.
+## New data
+- `pyq_master_2014_2026.csv` in `backend/data/` — real **1,300 questions**, 13 years
+  × 100, with official answer key, subject, subtopic, difficulty, format. No stems
+  (as in the source portal), so practice = mark your option vs the key.
+- `pyq_attempts`: scored with UPSC marking (+2 / −⅓); mirrored into `tests` (kind `pyq`).
+- `notion_entries`: local mirror of the active Notion DB (CA Tracker Pro — Daily Log, 191 rows) with `unread` flag.
+- `ai_messages` / `ai_sessions`: persistent chat memory. `omr_runs`: OMR evaluations.
+- Daily target = **600 min (10h mandatory)**.
 
-## Seed (backend/seed.py)
-`cd /app/backend && python seed.py` (idempotent; `--reset` wipes + reseeds):
-Aryavrat Sharma · UPSC CSE 2027 · PSIR optional · 480 min/day target · 6 subjects
-(88 real syllabus topics, 68.2% done) · ~99 sessions across 70 days (29-day streak) ·
-6 goals · 14 revisions (5 due now) · 12 mock tests (accuracy 48→69% trend).
+## Integrations (LIVE — keys in backend/.env)
+- **Notion**: token set; active DB = "CA Tracker Pro — Daily Log" (switchable on /notion via `/api/notion/databases` + `/databases/select`); discovery prefers the daily-log DB →
+  `102f009c-…` "Places / Seas / Straits / Disputed Areas — UPSC Tracker".
+  Pull mirrors all pages; PATCH writes title/status/priority/mnemonic/PYQ-history
+  back in real time. `/notion` page has subject/paper-wise filter boxes (Place Type,
+  Continent, Issue Type, Priority), search, unread-only toggle, unread column, and an
+  attachment lightbox with zoom in/out + download.
+- **Professor AI**: Mistral `mistral-small-latest` primary; its free tier rate-limits
+  (429), so `lib/ai.py` retries with backoff then falls back to the Emergent universal
+  key (`gpt-5.4`). **Both paths carry the same 5 admin tools** (log session, queue
+  revision, create goal, mark topic done, set daily target) so AI can really change the
+  app. Vision path (`pixtral-12b-2409` → fallback) reads OMR photos → JSON answers →
+  scored vs the pasted key → saved to test history. Provider shown per message.
 
 ## Pages
-`/login` PIN gate (one-click demo unlock) · `/` dashboard (countdown, streak, target
-ring, velocity chart, mastery bars, upcoming revisions, recent tests, active goals) ·
-`/sessions` logbook + filters · `/revisions` spaced queue (Easy/Good/Hard) · `/goals` ·
-`/tests` (trend chart + records) · `/subjects` syllabus matrix (toggle topics) ·
-`/insights` · `/settings` (Notion hub, profile, PIN change, lock).
+`/login` (PIN keypad, demo unlock) · `/` dashboard (live ticking countdown, study
+timer, target ring, streak, velocity, mastery, revisions, tests, goals) ·
+`/professor` AI chat + OMR + conversation memory · `/sessions` · `/revisions` ·
+`/pyq` · `/weakness` (radar + heatmap + burn-down + forecast) · `/goals` · `/tests` ·
+`/subjects` · `/insights` · `/notion` · `/settings` (Notion hub, profile, PIN, devices).
 
-## Verification (tier 1 — all clean)
-- curl smoke: 401/401/200 auth paths, subjects/insights fields, CRUD on
-  sessions+goals+revisions+tests, 422 negative, notion simulated responses — pass;
-  **public URL** unlock+me → 200.
-- `yarn typecheck` clean. Browser pass: login → dashboard → quick-log session →
-  revision review → notion test-connection → insights; no console errors.
+## Verification (all clean, via public URL)
+typecheck clean · PYQ scoring exact (3✓1✗ = 5.33/8) · Notion live pull 238 +
+filtered query 50 high-priority · weakness/burndown/forecast OK · 422 negative ·
+browser pass: unlock → countdown → timer ticking → PYQ scored → weak topic queued →
+Notion lightbox zoom → real AI reply → devices panel → mobile. No console errors.
+
+## Known
+- Mistral free tier 429s frequently → fallback provider answers instead (by design).
+- PYQ dataset has no question stems (source data limitation); practice is key-based.

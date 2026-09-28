@@ -19,8 +19,10 @@ import {
 } from "@/lib/recharts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import Countdown from "@/components/Countdown";
 import ProgressRing from "@/components/ProgressRing";
 import SessionDialog from "@/components/SessionDialog";
+import StudyTimer from "@/components/StudyTimer";
 import { CardShell, EmptyState, PageHeader, StatCard, SubjectChip } from "@/components/kit";
 import {
   KIND_LABELS,
@@ -107,7 +109,7 @@ export default function Dashboard() {
     <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
       <PageHeader
         overline={prof?.target_exam ?? "UPSC Civil Services Examination 2027"}
-        title={`Namaste, ${prof?.name ?? "Aspirant"}`}
+        title={`Namaste, ${prof?.name ?? "Professor"}`}
         description="Your command centre for syllabus mastery, revision cadence and mock performance."
         actions={
           <>
@@ -135,6 +137,9 @@ export default function Dashboard() {
           </>
         }
       />
+
+      <Countdown />
+      <StudyTimer />
 
       {/* Stat band */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

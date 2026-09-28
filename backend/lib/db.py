@@ -42,6 +42,26 @@ INDEXES: dict[str, list[IndexModel]] = {
     ],
     "notion_logs": [IndexModel([("created_at", DESCENDING)], name="created_desc")],
     "notion_mirror": [IndexModel([("created_at", DESCENDING)], name="created_desc")],
+    "notion_entries": [
+        IndexModel([("page_id", ASCENDING)], name="page_id", unique=True),
+        IndexModel([("last_edited_time", DESCENDING)], name="edited_desc"),
+        IndexModel([("unread", ASCENDING)], name="unread_asc"),
+        IndexModel([("place_type", ASCENDING)], name="place_type_asc"),
+        IndexModel([("priority", ASCENDING)], name="priority_asc"),
+    ],
+    "pyq_attempts": [
+        IndexModel([("id", ASCENDING)], name="id", unique=True),
+        IndexModel([("created_at", DESCENDING)], name="created_desc"),
+    ],
+    "ai_messages": [
+        IndexModel([("session_id", ASCENDING), ("created_at", ASCENDING)], name="session_created"),
+    ],
+    "ai_sessions": [
+        IndexModel([("id", ASCENDING)], name="id", unique=True),
+        IndexModel([("updated_at", DESCENDING)], name="updated_desc"),
+    ],
+    "omr_runs": [IndexModel([("date", DESCENDING)], name="date_desc")],
+    "devices": [IndexModel([("id", ASCENDING)], name="id", unique=True)],
     "app_meta": [IndexModel([("key", ASCENDING)], name="key", unique=True)],
 }
 

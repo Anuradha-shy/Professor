@@ -124,13 +124,205 @@ export interface NotionStatus {
   configured: boolean;
   token_hint: string | null;
   database_id: string | null;
+  database_title: string | null;
   last_synced_at: string | null;
+  cached_entries: number;
+  unread_entries: number;
 }
 
 export interface NotionTestOut {
   ok: boolean;
   message: string;
   database_title: string | null;
+  database_id: string | null;
+}
+
+export interface NotionSchemaOut {
+  database_id: string;
+  title: string;
+  options: Record<string, string[]>;
+  property_types: Record<string, string>;
+}
+
+export interface NotionImage {
+  name: string;
+  url: string;
+}
+
+export interface NotionDatabaseOption {
+  id: string;
+  title: string;
+  active: boolean;
+}
+
+export interface NotionEntry {
+  page_id: string;
+  title: string;
+  url: string;
+  status: string;
+  unread: boolean;
+  place_type: string;
+  priority: string;
+  continents: string[];
+  issue_types: string[];
+  country_tags: string[];
+  months: string[];
+  source_link: string;
+  memory_aid: string;
+  pyq_history: string;
+  last_updated: string;
+  images: NotionImage[];
+  last_edited_time: string;
+  values: Record<string, unknown>;
+}
+
+// --- pyq bank ---
+export interface PyqQuestion {
+  id: string;
+  year: number;
+  qnum: number;
+  subject: string;
+  subtopic: string;
+  difficulty: string;
+  format: string;
+  statement_count: number;
+  negative_stem: boolean;
+  current_affairs: boolean;
+  answer: string;
+  cancelled: boolean;
+}
+
+export interface PyqMeta {
+  total: number;
+  years: number[];
+  subjects: string[];
+  per_year: Record<string, number>;
+  per_subject: Record<string, number>;
+  difficulties: string[];
+}
+
+export interface PyqResultItem {
+  question_id: string;
+  year: number;
+  qnum: number;
+  subject: string;
+  subtopic: string;
+  marked: string;
+  correct_answer: string;
+  is_correct: boolean;
+}
+
+export interface PyqAttempt {
+  id: string;
+  label: string;
+  year: number | null;
+  subject: string | null;
+  total: number;
+  correct: number;
+  wrong: number;
+  skipped: number;
+  score: number;
+  max_score: number;
+  accuracy: number;
+  date: string;
+  items: PyqResultItem[];
+  weak_topics: string[];
+  created_at: string;
+}
+
+// --- analytics ---
+export interface WeaknessItem {
+  topic: string;
+  subject: string;
+  mock_hits: number;
+  pyq_wrong: number;
+  severity: number;
+  in_revision_queue: boolean;
+}
+
+export interface WeaknessOut {
+  items: WeaknessItem[];
+  total_topics: number;
+  critical: number;
+  not_queued: number;
+}
+
+export interface HeatCell {
+  date: string;
+  minutes: number;
+  weekday: number;
+  week: number;
+}
+
+export interface BurnDownPoint {
+  date: string;
+  remaining: number;
+  ideal: number;
+}
+
+export interface ForecastOut {
+  days_to_prelims: number;
+  avg_daily_minutes: number;
+  daily_target_minutes: number;
+  target_gap_minutes: number;
+  topics_remaining: number;
+  topics_per_week: number;
+  weeks_needed: number | null;
+  weeks_left: number;
+  on_track: boolean;
+  projected_hours_to_exam: number;
+}
+
+// --- professor ai ---
+export interface AiChatOut {
+  session_id: string;
+  reply: string;
+  provider: string;
+  actions: string[];
+}
+
+export interface AiMessage {
+  id: string;
+  session_id: string;
+  role: string;
+  content: string;
+  provider: string;
+  actions: string[];
+  created_at: string;
+}
+
+export interface AiSession {
+  id: string;
+  title: string;
+  provider: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OmrResultOut {
+  label: string;
+  provider: string;
+  detected: Record<string, string>;
+  detected_count: number;
+  evaluated: boolean;
+  correct: number;
+  wrong: number;
+  blank: number;
+  score: number;
+  max_score: number;
+  accuracy: number;
+  notes: string;
+  date: string;
+}
+
+export interface DeviceOut {
+  id: string;
+  label: string;
+  user_agent: string;
+  approved: boolean;
+  current: boolean;
+  last_seen: string;
+  created_at: string;
 }
 
 export interface NotionSyncOut {
@@ -151,7 +343,6 @@ export interface NotionLog {
 }
 
 export interface NotionMirrorRow {
-  id: string;
   page_id: string | null;
   title: string;
   subject: string;
