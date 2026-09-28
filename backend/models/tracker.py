@@ -241,6 +241,38 @@ class PyqQuestion(BaseModel):
     cancelled: bool = False
 
 
+class PyqQuestionDetail(PyqQuestion):
+    """Full read view of one PYQ — metadata plus every source trail we hold.
+
+    The master corpus is an answer-key + taxonomy inventory (UPSC does not release
+    machine-readable stems), so the reader shows the verified metadata and links
+    straight to the official paper and the researched source for that question.
+    """
+
+    news_cue: bool = False
+    stem_word_count: int = 0
+    option_count: int = 4
+    answer_valid: bool = True
+    question_text: str = ""
+    official_paper_url: str = ""
+    analysis_source_name: str = ""
+    analysis_source_url: str = ""
+    primary_source: str = ""
+    primary_source_url: str = ""
+    source_note: str = ""
+
+
+class ResetOut(BaseModel):
+    ok: bool
+    sessions_deleted: int
+    tests_deleted: int
+    pyq_attempts_deleted: int
+    revisions_deleted: int
+    topics_cleared: int
+    goals_reset: int
+    message: str
+
+
 class PyqMeta(BaseModel):
     total: int
     years: list[int]
@@ -418,6 +450,8 @@ class NotionSchemaOut(BaseModel):
 
 class NotionEntry(BaseModel):
     page_id: str
+    database_id: str = ""
+    database_title: str = ""
     title: str
     url: str = ""
     status: str = ""

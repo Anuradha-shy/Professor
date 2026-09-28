@@ -17,6 +17,7 @@ from models.tracker import (
     PyqAttemptCreate,
     PyqMeta,
     PyqQuestion,
+    PyqQuestionDetail,
     PyqResultItem,
 )
 from routers.auth import require_auth
@@ -24,7 +25,24 @@ from routers.auth import require_auth
 router = APIRouter(prefix="/pyq", tags=["pyq"], dependencies=[Depends(require_auth)])
 
 DATA_FILE = Path(__file__).parent.parent / "data" / "pyq_master_2014_2026.csv"
+SOURCE_FILE = Path(__file__).parent.parent / "data" / "source_tracking_2014_2026.csv"
 _CACHE: list[PyqQuestion] = []
+_RAW: dict[str, dict] = {}
+_SOURCES: dict[str, dict] = {}
+
+
+def _raw_rows() -> dict[str, dict]:
+    _load()
+    return _RAW
+
+
+def _sources() -> dict[str, dict]:
+    global _SOURCES
+    if _SOURCES or not SOURCE_FILE.exists():
+        return _SOURCES
+    with SOURCE_FILE.open(newline="", encoding="utf-8") as fh:
+        _SOURCES = {r["id"]: r for r in csv.DictReader(fh) if r.get("id")}
+    return _SOURCES
 
 
 def _load() -> list[PyqQuestion]:
@@ -37,6 +55,7 @@ def _load() -> list[PyqQuestion]:
     with DATA_FILE.open(newline="", encoding="utf-8") as fh:
         for r in csv.DictReader(fh):
             try:
+                _RAW[r["id"]] = r
                 rows.append(
                     PyqQuestion(
                         id=r["id"],
@@ -91,6 +110,40 @@ async def questions(
     if difficulty:
         qs = [q for q in qs if q.difficulty == difficulty]
     return sorted(qs, key=lambda q: (q.year, q.qnum))[:limit]
+
+
+@router.get("/questions/{qid}", response_model=PyqQuestionDetail)
+async def question_detail(qid: str) -> PyqQuestionDetail:
+    """Open one question: verified metadata + every source link we hold for it."""
+    raw = _raw_rows().get(qid)
+    if not raw:
+        raise HTTPException(status_code=404, detail="Question not found")
+    src = _sources().get(qid, {})
+    return PyqQuestionDetail(
+        id=qid,
+        year=int(raw["year"]),
+        qnum=int(raw["qnum"]),
+        subject=raw["subject"],
+        subtopic=raw.get("subtopic") or "",
+        difficulty=raw.get("difficulty_source_tag") or "moderate",
+        format=raw.get("format") or "Single-answer",
+        statement_count=int(float(raw.get("statement_count") or 0)),
+        negative_stem=str(raw.get("negative_stem")).lower() == "true",
+        current_affairs=str(raw.get("explicit_current_affairs_tag")).lower() == "true",
+        answer=(raw.get("answer") or "").strip().lower(),
+        cancelled=str(raw.get("cancelled")).lower() == "true",
+        news_cue=str(raw.get("news_cue")).lower() == "true",
+        stem_word_count=int(float(raw.get("stem_word_count") or 0)),
+        option_count=int(float(raw.get("option_count") or 4)),
+        answer_valid=str(raw.get("answer_valid")).lower() == "true",
+        question_text=(src.get("question_text_source") or "").strip(),
+        official_paper_url=(src.get("official_paper_source_url") or "").strip(),
+        analysis_source_name=(src.get("year_analysis_source_name") or "").strip(),
+        analysis_source_url=(src.get("year_analysis_source_url") or "").strip(),
+        primary_source=(src.get("primary_source") or src.get("secondary_source_claim") or "").strip(),
+        primary_source_url=(src.get("primary_source_url") or "").strip(),
+        source_note=(src.get("setter_source_note") or "").strip(),
+    )
 
 
 @router.get("/attempts", response_model=list[PyqAttempt])

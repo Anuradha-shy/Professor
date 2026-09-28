@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  BookOpen,
+  Check,
   Database,
   Download,
   ExternalLink,
@@ -52,12 +54,14 @@ export default function Notion() {
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [search, setSearch] = useState("");
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [dbFilter, setDbFilter] = useState("all");
   const [open, setOpen] = useState<NotionEntry | null>(null);
+  const [reading, setReading] = useState<NotionEntry | null>(null);
   const [zoom, setZoom] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [edit, setEdit] = useState({ title: "", memory_aid: "", pyq_history: "", priority: "" });
 
-  const entries = useNotionEntries({ ...filters, q: search, unread_only: unreadOnly });
+  const entries = useNotionEntries({ ...filters, q: search, unread_only: unreadOnly, database_id: dbFilter });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["notion"] });
 
@@ -89,18 +93,6 @@ export default function Notion() {
   });
 
   const list = entries.data ?? [];
-  const activeDb = dbs.data?.find((d) => d.active)?.id ?? "";
-
-  const switchDb = useMutation({
-    mutationFn: (database_id: string) =>
-      apiPost<{ message: string }>("/notion/databases/select", { database_id }),
-    onSuccess: (r) => {
-      toast.success(r.message);
-      invalidate();
-      pull.mutate();
-    },
-    onError: (e) => toast.error(errDetail(e)),
-  });
 
   // Fields worth showing for any database shape (the CA daily log has its own props).
   const extras = (e: NotionEntry) =>
@@ -153,15 +145,18 @@ export default function Notion() {
           <Label className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#8C6212]">
             Database
           </Label>
-          <Select value={activeDb} onValueChange={(v) => switchDb.mutate(v)}>
+          <Select value={dbFilter} onValueChange={(v) => setDbFilter(v)}>
             <SelectTrigger data-testid="notion-database-select" className="w-64">
               <SelectValue>
                 {(v) =>
-                  dbs.data?.find((d) => d.id === v)?.title ?? status.data?.database_title ?? "Choose"
+                  !v || v === "all"
+                    ? "All databases"
+                    : (dbs.data?.find((d) => d.id === v)?.title ?? "Database")
                 }
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">All databases</SelectItem>
               {(dbs.data ?? []).map((d) => (
                 <SelectItem key={d.id} value={d.id}>
                   {d.title}
@@ -334,6 +329,17 @@ export default function Notion() {
               <div className="mt-4 flex items-center gap-2">
                 <Button
                   size="xs"
+                  data-testid={`notion-read-open-${e.page_id}`}
+                  onClick={() => {
+                    setReading(e);
+                    if (e.unread) toggleRead.mutate({ id: e.page_id, unread: false });
+                  }}
+                  className="bg-[#1D3A2C] text-white hover:bg-[#2F5E48]"
+                >
+                  <BookOpen className="size-3.5" /> Read
+                </Button>
+                <Button
+                  size="xs"
                   variant="outline"
                   data-testid={`notion-edit-${e.page_id}`}
                   onClick={() => {
@@ -374,6 +380,90 @@ export default function Notion() {
           ))}
         </div>
       )}
+
+      {/* Reading view — full entry with a read tick */}
+      <Dialog open={reading !== null} onOpenChange={(o) => !o && setReading(null)}>
+        <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-2xl" data-testid="notion-reader">
+          <DialogHeader>
+            <DialogTitle className="pr-8 font-serif text-2xl leading-snug">
+              {reading?.title}
+            </DialogTitle>
+          </DialogHeader>
+          {reading ? (
+            <div className="grid gap-4">
+              <div className="flex flex-wrap items-center gap-2">
+                {reading.database_title ? (
+                  <Badge variant="outline" className="border-[#E8E3D7] font-mono text-[10px] uppercase tracking-[0.1em] text-[#5E6258]">
+                    {reading.database_title}
+                  </Badge>
+                ) : null}
+                <Button
+                  size="xs"
+                  variant={reading.unread ? "outline" : "default"}
+                  data-testid="notion-reader-read-tick"
+                  onClick={() => {
+                    const next = !reading.unread;
+                    toggleRead.mutate({ id: reading.page_id, unread: next });
+                    setReading({ ...reading, unread: next });
+                  }}
+                  className={reading.unread ? "" : "bg-[#1D4532] text-white hover:bg-[#2F5E48]"}
+                >
+                  <Check className="size-3.5" /> {reading.unread ? "Mark as read" : "Read"}
+                </Button>
+              </div>
+
+              {Object.entries(reading.values)
+                .filter(
+                  ([k, v]) =>
+                    k !== "Name" &&
+                    (typeof v === "string"
+                      ? v.trim().length > 0
+                      : Array.isArray(v)
+                        ? v.length > 0
+                        : v !== null && v !== undefined && v !== false),
+                )
+                .map(([k, v]) => (
+                  <div key={k} className="border-b border-[#F0EDE5] pb-3">
+                    <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#8C6212]">{k}</p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-[#383A34]">
+                      {Array.isArray(v) ? v.join(", ") : String(v)}
+                    </p>
+                  </div>
+                ))}
+
+              {reading.images.length ? (
+                <div className="flex flex-wrap gap-2" data-testid="notion-reader-images">
+                  {reading.images.map((img) => (
+                    <button
+                      key={img.url}
+                      type="button"
+                      onClick={() => {
+                        setZoom(img.url);
+                        setScale(1);
+                      }}
+                      className="size-24 overflow-hidden rounded-lg border border-[#E8E3D7] transition-transform hover:scale-105"
+                    >
+                      <img src={img.url} alt={img.name} className="size-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {reading.url ? (
+                <a
+                  href={reading.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  data-testid="notion-reader-open-notion"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-[#9B4E08] hover:text-[#7A3D06]"
+                >
+                  Open the full page in Notion <ExternalLink className="size-3.5" />
+                </a>
+              ) : null}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       {/* Edit dialog — writes back to Notion */}
       <Dialog open={open !== null} onOpenChange={(o) => !o && setOpen(null)}>

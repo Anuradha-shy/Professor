@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CheckCircle2, Cloud, KeyRound, Lock, RefreshCw, Sparkles } from "lucide-react";
+import { CheckCircle2, Cloud, KeyRound, Lock, RefreshCw, RotateCcw, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,7 +36,7 @@ import {
   useSubjects,
   useTests,
 } from "@/lib/queries";
-import type { DeviceOut, NotionSyncOut, NotionTestOut, Profile } from "@/lib/types";
+import type { DeviceOut, NotionSyncOut, NotionTestOut, Profile, ResetOut } from "@/lib/types";
 import { endSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
@@ -119,6 +119,15 @@ export default function Settings() {
     onSuccess: (d) => {
       toast.success(d.approved ? "Device approved" : "Device revoked");
       qc.invalidateQueries({ queryKey: ["auth", "devices"] });
+    },
+    onError: (error) => toast.error(errDetail(error)),
+  });
+
+  const resetProgress = useMutation({
+    mutationFn: () => apiPost<ResetOut>("/admin/reset-progress"),
+    onSuccess: (r) => {
+      toast.success(r.message);
+      qc.invalidateQueries();
     },
     onError: (error) => toast.error(errDetail(error)),
   });
@@ -420,6 +429,23 @@ export default function Settings() {
             onClick={() => void endSession()}
           >
             <Lock className="size-4" /> Lock now
+          </Button>
+          <Button
+            variant="outline"
+            data-testid="fresh-start-btn"
+            disabled={resetProgress.isPending}
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Fresh start: delete every logged session, test, PYQ attempt and revision, clear all syllabus ticks and reset goal progress to 0%. Subjects, syllabus and Notion data stay. Continue?",
+                )
+              )
+                resetProgress.mutate();
+            }}
+            className="border-[#B91C1C]/40 text-[#B91C1C] hover:bg-[#FDF0F0]"
+          >
+            <RotateCcw className="size-4" />
+            {resetProgress.isPending ? "Resetting…" : "Fresh start (reset progress to 0)"}
           </Button>
           <p className="text-xs text-[#5E6258]">
             {subjects.data?.length ?? 0} subjects · {sessions.data?.length ?? 0} sessions ·{" "}

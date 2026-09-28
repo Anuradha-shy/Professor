@@ -49,31 +49,42 @@ async def require_auth(tracker_session: str | None = Cookie(default=None, alias=
 
 
 async def _check_device(device_id: str, user_agent: str) -> None:
-    """Device binding: the first device to unlock is trusted; others need approval."""
+    """Device binding: the vault trusts the first device that unlocks it.
+
+    Bootstrap is idempotent — while no approved device exists yet, whichever device
+    unlocks becomes the trusted one (so a retried/duplicated request can't lock the
+    owner out of their own vault).
+    """
     if not device_id:
         return
-    known = await db.devices.find_one({"id": device_id})
     now = datetime.now(timezone.utc)
+    has_trusted = await db.devices.count_documents({"approved": True}) > 0
+    known = await db.devices.find_one({"id": device_id})
     if known:
-        if not known.get("approved"):
-            raise HTTPException(
-                status_code=403,
-                detail="This device is not approved. Approve it from Settings on your trusted device.",
+        if known.get("approved") or not has_trusted:
+            await db.devices.update_one(
+                {"id": device_id},
+                {"$set": {"approved": True, "last_seen": now, "user_agent": user_agent}},
             )
-        await db.devices.update_one({"id": device_id}, {"$set": {"last_seen": now, "user_agent": user_agent}})
-        return
-    first = await db.devices.count_documents({}) == 0
-    await db.devices.insert_one(
+            return
+        raise HTTPException(
+            status_code=403,
+            detail="This device is not approved. Approve it from Settings on your trusted device.",
+        )
+    await db.devices.update_one(
+        {"id": device_id},
         {
-            "id": device_id,
-            "label": "This device" if first else "New device",
-            "user_agent": user_agent,
-            "approved": first,  # the very first device is trusted automatically
-            "last_seen": now,
-            "created_at": now,
-        }
+            "$set": {
+                "label": "This device" if not has_trusted else "New device",
+                "user_agent": user_agent,
+                "approved": not has_trusted,
+                "last_seen": now,
+            },
+            "$setOnInsert": {"id": device_id, "created_at": now},
+        },
+        upsert=True,
     )
-    if not first:
+    if has_trusted:
         raise HTTPException(
             status_code=403,
             detail="New device detected. Approve it from Settings on your trusted device.",

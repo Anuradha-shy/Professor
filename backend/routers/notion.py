@@ -114,7 +114,7 @@ def _plain(rich: list[dict]) -> str:
     return "".join(x.get("plain_text", "") for x in rich or [])
 
 
-def _flatten(page: dict) -> NotionEntry:
+def _flatten(page: dict, database_id: str = "", database_title: str = "") -> NotionEntry:
     """Notion page → flat, filterable row (keeps files/attachments as URLs)."""
     props: dict[str, Any] = page.get("properties", {})
     values: dict[str, Any] = {}
@@ -150,6 +150,8 @@ def _flatten(page: dict) -> NotionEntry:
     status = str(values.get("Status") or "")
     return NotionEntry(
         page_id=page["id"],
+        database_id=database_id or str((page.get("parent") or {}).get("database_id") or ""),
+        database_title=database_title,
         title=title or "Untitled",
         url=page.get("url", ""),
         status=status,
@@ -243,9 +245,8 @@ async def select_database(input: DatabaseSelectIn) -> NotionTestOut:
         raise HTTPException(status_code=exc.status if exc.status != 502 else 503, detail=exc.message)
     title = "".join(t.get("plain_text", "") for t in data.get("title", [])) or "Untitled"
     await _remember(str(data["id"]), title)
-    await db.notion_entries.delete_many({})
     return NotionTestOut(
-        ok=True, message=f"Now reading “{title}”. Hit sync to pull it in.",
+        ok=True, message=f"Writes now target “{title}”.",
         database_title=title, database_id=str(data["id"]),
     )
 
@@ -272,21 +273,32 @@ async def schema() -> NotionSchemaOut:
 
 
 @router.post("/pull", response_model=NotionSyncOut)
-async def pull() -> NotionSyncOut:
-    """Pull every page from Notion into the local mirror (full refresh)."""
+async def pull(all_databases: bool = True) -> NotionSyncOut:
+    """Pull pages into the local mirror — every shared database by default."""
     try:
-        dbid = await _database_id()
+        if all_databases:
+            targets = await _list_databases()
+        else:
+            active = await _database_id()
+            targets = [d for d in await _list_databases() if d["id"] == active] or [
+                {"id": active, "title": ""}
+            ]
         entries: list[NotionEntry] = []
-        cursor: str | None = None
-        while True:
-            body: dict[str, Any] = {"page_size": 100}
-            if cursor:
-                body["start_cursor"] = cursor
-            data = await _notion("POST", f"/v1/databases/{dbid}/query", body)
-            entries.extend(_flatten(p) for p in data.get("results", []) if p.get("object") == "page")
-            if not data.get("has_more"):
-                break
-            cursor = data.get("next_cursor")
+        for target in targets:
+            cursor: str | None = None
+            while True:
+                body: dict[str, Any] = {"page_size": 100}
+                if cursor:
+                    body["start_cursor"] = cursor
+                data = await _notion("POST", f"/v1/databases/{target['id']}/query", body)
+                entries.extend(
+                    _flatten(p, target["id"], target["title"])
+                    for p in data.get("results", [])
+                    if p.get("object") == "page"
+                )
+                if not data.get("has_more"):
+                    break
+                cursor = data.get("next_cursor")
     except NotionApiError as exc:
         msg = f"Notion API error {exc.status}: {exc.message}"
         await db.notion_logs.insert_one(NotionLog(action="pull", mode="live", ok=False, message=msg).model_dump())
@@ -314,6 +326,7 @@ async def pull() -> NotionSyncOut:
 @router.get("/entries", response_model=list[NotionEntry])
 async def entries(
     q: str | None = None,
+    database_id: str | None = None,
     place_type: str | None = None,
     continent: str | None = None,
     issue_type: str | None = None,
@@ -321,6 +334,8 @@ async def entries(
     unread_only: bool = False,
 ) -> list[NotionEntry]:
     query: dict[str, Any] = {}
+    if database_id and database_id != "all":
+        query["database_id"] = database_id
     if q:
         query["title"] = {"$regex": q, "$options": "i"}
     if place_type:
@@ -333,7 +348,7 @@ async def entries(
         query["priority"] = priority
     if unread_only:
         query["unread"] = True
-    docs = await db.notion_entries.find(query).sort([("last_edited_time", -1)]).to_list(300)
+    docs = await db.notion_entries.find(query).sort([("last_edited_time", -1)]).to_list(600)
     return [NotionEntry(**{k: v for k, v in d.items() if k != "_id"}) for d in docs]
 
 
@@ -359,12 +374,14 @@ async def update_entry(page_id: str, input: NotionEntryUpdate) -> NotionEntry:
             raise HTTPException(status_code=exc.status if exc.status != 502 else 503, detail=exc.message)
         entry = _flatten(page)
         doc = entry.model_dump()
+        existing = await db.notion_entries.find_one({"page_id": page_id})
+        if existing:
+            doc["database_id"] = doc["database_id"] or existing.get("database_id", "")
+            doc["database_title"] = existing.get("database_title", "")
         if input.unread is not None:
             doc["unread"] = input.unread
-        else:
-            existing = await db.notion_entries.find_one({"page_id": page_id})
-            if existing is not None:
-                doc["unread"] = existing.get("unread", entry.unread)
+        elif existing is not None:
+            doc["unread"] = existing.get("unread", entry.unread)
         await db.notion_entries.update_one({"page_id": page_id}, {"$set": doc}, upsert=True)
         return NotionEntry(**doc)
 

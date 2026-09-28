@@ -19,6 +19,7 @@ load_dotenv(ROOT_DIR / '.env')
 from lib.db import client, db, ensure_indexes
 
 from routers.ai import router as ai_router
+from routers.admin import router as admin_router
 from routers.analytics import router as analytics_router
 from routers.auth import router as auth_router
 from routers.goals import router as goals_router
@@ -86,6 +87,7 @@ api_router.include_router(analytics_router)
 api_router.include_router(pyq_router)
 api_router.include_router(ai_router)
 api_router.include_router(notion_router)
+api_router.include_router(admin_router)
 
 # Include the router in the main app — keep this the LAST router statement
 app.include_router(api_router)

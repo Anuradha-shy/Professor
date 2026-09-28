@@ -157,6 +157,8 @@ export interface NotionDatabaseOption {
 
 export interface NotionEntry {
   page_id: string;
+  database_id: string;
+  database_title: string;
   title: string;
   url: string;
   status: string;
@@ -190,6 +192,31 @@ export interface PyqQuestion {
   current_affairs: boolean;
   answer: string;
   cancelled: boolean;
+}
+
+export interface PyqQuestionDetail extends PyqQuestion {
+  news_cue: boolean;
+  stem_word_count: number;
+  option_count: number;
+  answer_valid: boolean;
+  question_text: string;
+  official_paper_url: string;
+  analysis_source_name: string;
+  analysis_source_url: string;
+  primary_source: string;
+  primary_source_url: string;
+  source_note: string;
+}
+
+export interface ResetOut {
+  ok: boolean;
+  sessions_deleted: number;
+  tests_deleted: number;
+  pyq_attempts_deleted: number;
+  revisions_deleted: number;
+  topics_cleared: number;
+  goals_reset: number;
+  message: string;
 }
 
 export interface PyqMeta {

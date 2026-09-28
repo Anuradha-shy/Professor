@@ -19,6 +19,7 @@ import type {
   PyqAttempt,
   PyqMeta,
   PyqQuestion,
+  PyqQuestionDetail,
   Revision,
   Subject,
   StudySession,
@@ -117,6 +118,13 @@ export const usePyqQuestions = (year: number | null, subject: string) => {
     enabled: Boolean(year || subject),
   });
 };
+
+export const usePyqQuestion = (id: string | null) =>
+  useQuery({
+    queryKey: ["pyq", "question", id],
+    queryFn: () => apiGet<PyqQuestionDetail>(`/pyq/questions/${id}`),
+    enabled: Boolean(id),
+  });
 
 export const usePyqAttempts = () =>
   useQuery({ queryKey: qk.pyqAttempts, queryFn: () => apiGet<PyqAttempt[]>("/pyq/attempts") });

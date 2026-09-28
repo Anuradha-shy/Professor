@@ -1,9 +1,15 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CheckCircle2, Library, XCircle } from "lucide-react";
+import { CheckCircle2, ExternalLink, Library, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -14,7 +20,7 @@ import {
 import { EmptyState, PageHeader, StatCard } from "@/components/kit";
 import { apiPost } from "@/lib/api";
 import { errDetail, fmtDate } from "@/lib/format";
-import { usePyqAttempts, usePyqMeta, usePyqQuestions } from "@/lib/queries";
+import { usePyqAttempts, usePyqMeta, usePyqQuestion, usePyqQuestions } from "@/lib/queries";
 import type { PyqAttempt } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +34,8 @@ export default function Pyq() {
   const [subject, setSubject] = useState("");
   const [marks, setMarks] = useState<Record<string, string>>({});
   const [result, setResult] = useState<PyqAttempt | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const detail = usePyqQuestion(openId);
   const questions = usePyqQuestions(year, subject);
 
   const list = questions.data ?? [];
@@ -206,8 +214,13 @@ export default function Pyq() {
                 <span className="w-16 font-mono text-sm font-semibold text-[#5E6258]">
                   {q.year}·{q.qnum}
                 </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-[#1C1D18]">
+                <button
+                  type="button"
+                  data-testid={`pyq-open-${q.id}`}
+                  onClick={() => setOpenId(q.id)}
+                  className="min-w-0 flex-1 text-left transition-colors hover:text-[#9B4E08]"
+                >
+                  <p className="truncate text-sm font-medium text-[#1C1D18] underline decoration-[#E8E3D7] decoration-dotted underline-offset-4">
                     {q.subtopic || q.subject}
                   </p>
                   <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
@@ -223,7 +236,7 @@ export default function Pyq() {
                       </Badge>
                     ) : null}
                   </div>
-                </div>
+                </button>
                 <div className="flex items-center gap-1">
                   {OPTIONS.map((opt) => {
                     const selected = marks[q.id] === opt;
@@ -263,6 +276,91 @@ export default function Pyq() {
           })}
         </ul>
       )}
+
+      {/* Question reader — full metadata + source trail */}
+      <Dialog open={openId !== null} onOpenChange={(o) => !o && setOpenId(null)}>
+        <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-lg" data-testid="pyq-detail-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-2xl">
+              {detail.data ? `UPSC ${detail.data.year} · Q${detail.data.qnum}` : "Loading…"}
+            </DialogTitle>
+          </DialogHeader>
+          {detail.isPending ? (
+            <div className="h-40 animate-pulse rounded-xl bg-[#F0EDE5]" />
+          ) : detail.data ? (
+            <div className="grid gap-4 text-sm text-[#383A34]" data-testid="pyq-detail-body">
+              <div className="flex flex-wrap gap-1.5">
+                <Badge className="border-0 bg-[#EDF5F0] font-mono text-[10px] uppercase tracking-[0.12em] text-[#1D4532]">
+                  {detail.data.subject}
+                </Badge>
+                <Badge variant="outline" className="border-[#E8E3D7] font-mono text-[10px] uppercase tracking-[0.12em]">
+                  {detail.data.difficulty}
+                </Badge>
+                <Badge variant="outline" className="border-[#E8E3D7] font-mono text-[10px] uppercase tracking-[0.12em]">
+                  {detail.data.format}
+                </Badge>
+                {detail.data.cancelled ? (
+                  <Badge className="border-0 bg-[#FDF0F0] font-mono text-[10px] uppercase text-[#B91C1C]">
+                    cancelled by UPSC
+                  </Badge>
+                ) : null}
+              </div>
+              <p className="font-serif text-lg leading-snug text-[#1C1D18]">
+                {detail.data.subtopic || detail.data.subject}
+              </p>
+              <div className="rounded-xl border border-[#E8E3D7] bg-[#FBF9F4] p-4">
+                <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#8C6212]">
+                  Official answer key
+                </p>
+                <p className="mt-1 font-serif text-3xl font-semibold uppercase text-[#1D3A2C]">
+                  {detail.data.answer || "—"}
+                </p>
+                <p className="mt-1 text-xs text-[#5E6258]">
+                  {detail.data.option_count} options · {detail.data.statement_count || "no"} statements ·{" "}
+                  {detail.data.negative_stem ? "negative stem" : "direct stem"} ·{" "}
+                  {detail.data.stem_word_count} words in the original stem
+                </p>
+              </div>
+              <p className="text-xs leading-relaxed text-[#5E6258]">
+                UPSC does not publish machine-readable question stems, so this bank stores the
+                verified key, taxonomy and source trail. Read the exact wording in the official
+                paper linked below.
+              </p>
+              <div className="grid gap-2">
+                {detail.data.official_paper_url ? (
+                  <a
+                    href={detail.data.official_paper_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    data-testid="pyq-detail-official-link"
+                    className="inline-flex items-center gap-1.5 font-medium text-[#9B4E08] hover:text-[#7A3D06]"
+                  >
+                    Official UPSC paper archive <ExternalLink className="size-3.5" />
+                  </a>
+                ) : null}
+                {detail.data.analysis_source_url ? (
+                  <a
+                    href={detail.data.analysis_source_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    data-testid="pyq-detail-analysis-link"
+                    className="inline-flex items-center gap-1.5 text-[#5E6258] hover:text-[#1C1D18]"
+                  >
+                    {detail.data.analysis_source_name || "Year analysis"} <ExternalLink className="size-3.5" />
+                  </a>
+                ) : null}
+                {detail.data.primary_source ? (
+                  <p className="text-xs text-[#5E6258]">
+                    Researched source: {detail.data.primary_source}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-[#B91C1C]">Could not load this question.</p>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {(attempts.data ?? []).length > 0 ? (
         <section data-testid="pyq-history" className="rounded-2xl border border-[#E8E3D7] bg-white p-6">
