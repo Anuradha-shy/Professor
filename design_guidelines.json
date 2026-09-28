@@ -1,0 +1,247 @@
+{
+  "theme_archetype": "Warm Editorial Light — Ink on Ivory with Saffron/Deep-Forest UPSC Nod & Subtle 3D Background Canvas",
+  "archetype_number": 1,
+  "app_type": "dashboard",
+  "emotional_tone": "Refined, Scholarly, Disciplined, Prestigious, Calm & Laser-Focused",
+  "fonts": {
+    "heading_family": "Lora Variable",
+    "body_family": "DM Sans Variable",
+    "mono_family": "JetBrains Mono Variable",
+    "imports": [
+      "@import \"@fontsource-variable/lora\";",
+      "@import \"@fontsource-variable/dm-sans\";",
+      "@import \"@fontsource-variable/jetbrains-mono\";"
+    ],
+    "css_theme_vars": {
+      "--font-heading": "'Lora Variable', serif",
+      "--font-sans": "'DM Sans Variable', sans-serif",
+      "--font-mono": "'JetBrains Mono Variable', monospace"
+    }
+  },
+  "typography": {
+    "scale_px": {
+      "display": 52,
+      "h1": 38,
+      "h2": 28,
+      "h3": 20,
+      "h4": 18,
+      "body": 16,
+      "caption": 14
+    },
+    "rules": {
+      "display": "text-4xl sm:text-5xl font-serif font-semibold tracking-tight text-[#1C1D18] leading-[1.15]",
+      "h1": "text-3xl sm:text-4xl font-serif font-semibold tracking-tight text-[#1C1D18]",
+      "h2": "text-2xl sm:text-3xl font-serif font-medium tracking-tight text-[#1C1D18]",
+      "h3": "text-lg sm:text-xl font-sans font-semibold tracking-normal text-[#1C1D18]",
+      "h4": "text-base sm:text-lg font-sans font-semibold tracking-normal text-[#1C1D18]",
+      "body": "text-base font-sans font-normal text-[#383A34] leading-relaxed",
+      "caption": "text-sm font-sans font-normal text-[#5E6258]",
+      "overline": "text-xs font-mono font-medium uppercase tracking-[0.18em] text-[#8C6212]"
+    }
+  },
+  "colors": {
+    "surfaces": [
+      {
+        "name": "page",
+        "kind": "solid",
+        "bg": "#FBF9F4",
+        "on_bg": "#1C1D18",
+        "on_bg_muted": "#5E6258",
+        "roles": {
+          "link": "#9B4E08",
+          "error": "#B91C1C",
+          "success": "#15803D",
+          "border": "#E8E3D7",
+          "border_subtle": "#F0EDE5"
+        }
+      },
+      {
+        "name": "panel",
+        "kind": "solid",
+        "bg": "#FFFFFF",
+        "on_bg": "#1C1D18",
+        "on_bg_muted": "#5E6258",
+        "roles": {
+          "link": "#9B4E08",
+          "error": "#B91C1C",
+          "success": "#15803D",
+          "border": "#E8E3D7",
+          "border_focus": "#C8640E"
+        }
+      },
+      {
+        "name": "panel_elevated",
+        "kind": "solid",
+        "bg": "#F6F2E9",
+        "on_bg": "#1C1D18",
+        "on_bg_muted": "#5E6258",
+        "roles": {
+          "border": "#E2DC CE"
+        }
+      },
+      {
+        "name": "saffron_accent",
+        "kind": "solid",
+        "bg": "#C8640E",
+        "on_bg": "#FFFFFF",
+        "on_bg_muted": "#FEE6CA"
+      },
+      {
+        "name": "saffron_subtle",
+        "kind": "solid",
+        "bg": "#FEF3E2",
+        "on_bg": "#8A3D04",
+        "on_bg_muted": "#A55208"
+      },
+      {
+        "name": "deep_forest_accent",
+        "kind": "solid",
+        "bg": "#1D3A2C",
+        "on_bg": "#F5F8F6",
+        "on_bg_muted": "#B5C8BD"
+      },
+      {
+        "name": "forest_subtle",
+        "kind": "solid",
+        "bg": "#EDF5F0",
+        "on_bg": "#1D4532",
+        "on_bg_muted": "#2F5E48"
+      },
+      {
+        "name": "inverse",
+        "kind": "solid",
+        "bg": "#1C1D18",
+        "on_bg": "#FBF9F4",
+        "on_bg_muted": "#A3A79E"
+      },
+      {
+        "name": "glass_header",
+        "kind": "glass",
+        "contrast_against": "#F3EFE6",
+        "guarantee": "backdrop-blur-xl bg-[#FBF9F4]/85 border-b border-[#E8E3D7]/90",
+        "on_bg": "#1C1D18",
+        "on_bg_muted": "#5E6258"
+      },
+      {
+        "name": "pin_lock_modal",
+        "kind": "glass",
+        "contrast_against": "#EBE4D5",
+        "guarantee": "backdrop-blur-2xl bg-[#FFFFFF]/95 shadow-[0_24px_64px_rgba(28,29,24,0.12)] border border-[#E8E3D7]",
+        "on_bg": "#1C1D18",
+        "on_bg_muted": "#5E6258"
+      }
+    ],
+    "accent": "#C8640E",
+    "on_accent": "#FFFFFF",
+    "brand_palette": {
+      "saffron": "#C8640E",
+      "saffron_hover": "#A85309",
+      "saffron_light": "#FFF5E6",
+      "forest": "#1D3A2C",
+      "forest_light": "#EDF5F0",
+      "ivory_bg": "#FBF9F4",
+      "parchment_card": "#FFFFFF",
+      "ink_dark": "#1C1D18",
+      "ink_medium": "#383A34",
+      "ink_muted": "#5E6258",
+      "border_rule": "#E8E3D7",
+      "chart_colors": {
+        "gs1_history": "#C8640E",
+        "gs2_polity": "#1D3A2C",
+        "gs3_economy_env": "#0F5B78",
+        "gs4_ethics": "#843B62",
+        "optional_subject": "#6247AA",
+        "csat_current": "#B8860B"
+      }
+    }
+  },
+  "entry_surfaces": {
+    "/login": "PIN Gate Passcode Lock screen — centered scholarly security vault with warm ivory backdrop, floating subtle 3D geometric ring mesh, and quick demo pin button (PIN: 1947 or 2026)",
+    "/": "Asymmetric Executive Dashboard — Top status banner with study streak + daily target meter, left dominant 8-col grid (Study ring progress, today's focus timer, 7-day study velocity chart, upcoming spaced revisions), right 4-col rail (Mock test trend radar, subject mastery bars, active goals, quick session logger)",
+    "/sessions": "Study Logbook & Timer — Top live pomodoro/stopwatch tracker with subject selector, followed by a filterable editorial log table with notes, duration, tags, and revision scheduling",
+    "/goals": "Strategic Milestones & UPSC GS/Prelims Roadmap — Grid of syllabus target cards with percentage rings, target completion dates, sub-task checklists, and priority badges",
+    "/revisions": "Spaced Repetition Queue (SuperMemo-inspired UPSC revision) — Due today vs Upcoming 7-day queue, subject filter pills, 1-click 'Mark Revised' with retention score selector (Easy/Good/Hard)",
+    "/tests": "Mock Test & Prelims/Mains Practice Analytics — Test record modal, score distribution trend line (GS1 & CSAT), accuracy breakdown, topic weakness analysis",
+    "/subjects": "Syllabus Matrix & Mastery Tracker — Expandable GS Paper I, II, III, IV & Optional subject modules with progress bars, completed subtopics, and linked session history",
+    "/insights": "Productivity Intelligence — Hourly study heatmaps, best time-of-day analytics, subject balance radar/donut, weekly velocity comparison",
+    "/settings": "Preferences & Notion Database Sync Hub — Notion API key & Database ID setup, two-way sync simulation, data export/import (JSON/CSV), PIN passcode configuration, Seed data reset"
+  },
+  "visual_enhancers": {
+    "3d_element": {
+      "type": "Interactive Subtle 3D Geometric Ring / Wireframe Polyhedron in Hero/Background",
+      "implementation": "Three.js / React Three Fiber lightweight canvas or CSS 3D Particle Orbit with transparent canvas background (alpha: true). Rotates gently with mouse movement, representing disciplined focus and progress rings.",
+      "lighting": "Warm ambient light (#FFF8EE) + subtle directional amber key light with low intensity so text remains 100% crisp and readable.",
+      "performance": "Pointer-events-none, z-0 background overlay, pauses on mobile or when window is blurred."
+    },
+    "textures": "Subtle 2% noise / editorial paper stipple pattern on `#FBF9F4` page background to evoke UPSC standard archival paper & civil services books.",
+    "border_style": "1px crisp `#E8E3D7` hairline borders with subtle `#F0EDE5` inner shadows on cards.",
+    "badges": "Pill-shaped badges with font-mono overlines, e.g., 'GS-II: POLITY' in forest green, 'REVISION DUE' in saffron amber."
+  },
+  "navigation_structure": {
+    "header": "Sticky Glassmorphism Nav (`backdrop-blur-xl bg-[#FBF9F4]/90 border-b border-[#E8E3D7] z-40`)",
+    "branding": {
+      "title": "ASHOKA ACADEMY",
+      "subtitle": "UPSC CSE Personal Tracker & Progress Intelligence",
+      "emblem_style": "Refined Ashoka Chakra / Feather Quill insignia in deep saffron & forest green"
+    },
+    "links": [
+      {"name": "Dashboard", "path": "/", "icon": "LayoutDashboard"},
+      {"name": "Study Log", "path": "/sessions", "icon": "Clock"},
+      {"name": "Revision Queue", "path": "/revisions", "icon": "RotateCcw"},
+      {"name": "Goals", "path": "/goals", "icon": "Target"},
+      {"name": "Mock Tests", "path": "/tests", "icon": "GraduationCap"},
+      {"name": "Syllabus Matrix", "path": "/subjects", "icon": "BookOpen"},
+      {"name": "Productivity Insights", "path": "/insights", "icon": "LineChart"},
+      {"name": "Notion Sync", "path": "/settings", "icon": "Database"}
+    ],
+    "header_actions": [
+      {"type": "button", "label": "Quick Log Session", "variant": "saffron", "action": "open_session_modal"},
+      {"type": "pin_status", "label": "Vault Protected", "action": "lock_app"}
+    ]
+  },
+  "mocked_flows_and_integrations": [
+    "Notion Database Sync: MOCKED two-way synchronization simulator with realistic status responses, field mapping preview, last synced timestamp, and test connection action.",
+    "PIN Gate Auth: Passcode stored in localStorage + secure backend session check (Default Demo PIN: 1947 or 2026, with an instant 'Quick Unlock with Demo PIN' button for seamless evaluator access)."
+  ],
+  "sample_seeded_data": {
+    "candidate_profile": {
+      "name": "Aryavrat Sharma",
+      "target_exam": "UPSC Civil Services Examination 2026",
+      "optional_subject": "Political Science & International Relations (PSIR)",
+      "target_hours_daily": 8.0,
+      "current_streak_days": 42,
+      "total_hours_logged": 684.5,
+      "syllabus_completion_pct": 68.5
+    },
+    "subjects": [
+      {"id": "gs1", "name": "GS Paper I (History, Art & Culture, Geography, Society)", "color": "#C8640E", "completed_topics": 48, "total_topics": 65},
+      {"id": "gs2", "name": "GS Paper II (Polity, Governance, Constitution, IR)", "color": "#1D3A2C", "completed_topics": 52, "total_topics": 60},
+      {"id": "gs3", "name": "GS Paper III (Economy, Agriculture, Sci-Tech, Env, Security)", "color": "#0F5B78", "completed_topics": 41, "total_topics": 70},
+      {"id": "gs4", "name": "GS Paper IV (Ethics, Integrity, Aptitude & Case Studies)", "color": "#843B62", "completed_topics": 30, "total_topics": 40},
+      {"id": "optional", "name": "Optional: PSIR Paper 1 & 2", "color": "#6247AA", "completed_topics": 58, "total_topics": 75},
+      {"id": "csat", "name": "CSAT (Aptitude & Reading Comprehension)", "color": "#B8860B", "completed_topics": 22, "total_topics": 30}
+    ]
+  },
+  "motion_and_interactions": {
+    "page_transitions": "Subtle fade-in and slide-up (0.25s ease-out) via `motion/react`",
+    "interactive_cards": "Hover lift `hover:-translate-y-0.5 hover:shadow-md transition-all duration-200`",
+    "progress_rings": "Animated SVG stroke-dashoffset with smooth 0.8s ease-out curve",
+    "pin_keypad": "Tactile micro-scale click feedback (scale 0.95 on active)"
+  },
+  "accessibility": {
+    "contrast_target": "WCAG AA / APCA > 60 for all body text, 7:1 for headers",
+    "keyboard_nav": "Full tab index and Enter/Space triggers for PIN keypad and quick actions",
+    "screen_readers": "Aria-labels on progress bars, revision counters, and mock test scores",
+    "data_testids": "data-testid attributes on all interactive buttons, inputs, tabs, modal triggers, and pin keys"
+  },
+  "instructions_to_main_agent": [
+    "1. Read this entire guidelines file and strictly maintain the Warm Editorial Light theme (#FBF9F4 ivory, #1C1D18 ink, #C8640E saffron accent, #1D3A2C forest green).",
+    "2. Use Lora for headers/brand (`--font-heading`), DM Sans for body (`--font-sans`), and JetBrains Mono for metrics/codes (`--font-mono`). Fonts are already pre-installed in `@fontsource-variable/*`.",
+    "3. Build a beautiful 3D ambient element in the background or hero (using Three.js / Canvas or CSS 3D Rings) that is lightweight and transparent.",
+    "4. Implement the PIN gate: When user opens the site for the first time or clicks Lock, show the PIN Gate screen. Provide a 1-click 'Unlock with Demo PIN (1947)' button so testing subagents and evaluators can bypass it immediately without friction.",
+    "5. Include full CRUD/interactive features for Study Sessions, Goals, Revision Queue (spaced repetition), Mock Tests, and Subject Syllabus Matrix.",
+    "6. Build the dedicated Notion Database Sync settings page with simulated API connection, field mapping cards, and sync logs (explicitly marked MOCKED sync capability with real working local persistence).",
+    "7. Add realistic UPSC seed data (GS1-4, PSIR optional, Prelims mock tests with 110-135 score ranges, spaced revisions for Laxmikanth, Spectrum Modern History, Shankar IAS Environment, etc.).",
+    "8. Ensure every button, input, tab, and card has explicit `data-testid` attributes (e.g. `data-testid=\"quick-log-session-btn\"`, `data-testid=\"pin-key-1\"`, `data-testid=\"revision-item-1\"`)."
+  ]
+}
