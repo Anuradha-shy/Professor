@@ -19,6 +19,7 @@ from models.tracker import (
     PyqQuestion,
     PyqQuestionDetail,
     PyqResultItem,
+    PyqTopicTrend,
 )
 from routers.auth import require_auth
 
@@ -26,6 +27,7 @@ router = APIRouter(prefix="/pyq", tags=["pyq"], dependencies=[Depends(require_au
 
 DATA_FILE = Path(__file__).parent.parent / "data" / "pyq_master_2014_2026.csv"
 SOURCE_FILE = Path(__file__).parent.parent / "data" / "source_tracking_2014_2026.csv"
+TREND_FILE = Path(__file__).parent.parent / "data" / "topic_frequency_top100_2014_2025.csv"
 _CACHE: list[PyqQuestion] = []
 _RAW: dict[str, dict] = {}
 _SOURCES: dict[str, dict] = {}
@@ -51,11 +53,13 @@ def _load() -> list[PyqQuestion]:
         return _CACHE
     if not DATA_FILE.exists():
         return []
+    sources = _sources()
     rows: list[PyqQuestion] = []
     with DATA_FILE.open(newline="", encoding="utf-8") as fh:
         for r in csv.DictReader(fh):
             try:
                 _RAW[r["id"]] = r
+                source = sources.get(r["id"], {})
                 rows.append(
                     PyqQuestion(
                         id=r["id"],
@@ -70,6 +74,7 @@ def _load() -> list[PyqQuestion]:
                         current_affairs=str(r.get("explicit_current_affairs_tag")).lower() == "true",
                         answer=(r.get("answer") or "").strip().lower(),
                         cancelled=str(r.get("cancelled")).lower() == "true",
+                        official_paper_url=(source.get("official_paper_source_url") or "").strip(),
                     )
                 )
             except (ValueError, KeyError):
@@ -93,6 +98,15 @@ async def meta() -> PyqMeta:
         per_subject=per_subject,
         difficulties=sorted({q.difficulty for q in qs if q.difficulty}),
     )
+
+
+@router.get("/trends", response_model=list[PyqTopicTrend])
+async def topic_trends(limit: int = Query(default=100, ge=1, le=100)) -> list[PyqTopicTrend]:
+    if not TREND_FILE.exists():
+        return []
+    with TREND_FILE.open(newline="", encoding="utf-8") as fh:
+        trends = [PyqTopicTrend(**row) for row in csv.DictReader(fh)]
+    return sorted(trends, key=lambda item: (-item.recent_2021_25, -item.all_2014_25))[:limit]
 
 
 @router.get("/questions", response_model=list[PyqQuestion])

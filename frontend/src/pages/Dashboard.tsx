@@ -2,8 +2,17 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
+  BarChart3,
+  BookOpen,
+  CalendarDays,
+  FileText,
   Flame,
+  Library,
+  ListChecks,
+  Play,
+  Radar,
   RotateCcw,
+  Sparkles,
   Target,
   TrendingUp,
   WifiOff,
@@ -12,6 +21,8 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  ComposedChart,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -32,11 +43,14 @@ import {
   fmtHours,
   fmtMinutes,
 } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import {
   useGoals,
   useInsights,
+  usePyqAttempts,
   useProfile,
   useRevisions,
+  useSessions,
   useSubjects,
   useTests,
 } from "@/lib/queries";
@@ -89,7 +103,10 @@ export default function Dashboard() {
   const goals = useGoals();
   const revisions = useRevisions();
   const tests = useTests();
+  const sessions = useSessions(10_000);
+  const pyqAttempts = usePyqAttempts();
   const [logOpen, setLogOpen] = useState(false);
+  const [activityRange, setActivityRange] = useState<7 | 14 | 30 | 90 | 0>(14);
 
   const ins = insights.data;
   const prof = profile.data;
@@ -104,6 +121,52 @@ export default function Dashboard() {
   const activeGoals = (goals.data ?? []).filter((g) => g.status === "active").slice(0, 3);
   const totalTopics = (subjects.data ?? []).reduce((a, s) => a + s.total_topics, 0);
   const doneTopics = (subjects.data ?? []).reduce((a, s) => a + s.completed_topics, 0);
+  const today = new Date();
+  const dateKey = (date: Date) => date.toISOString().slice(0, 10);
+  const todayKey = dateKey(today);
+  const yesterdayDate = new Date(today);
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterdayKey = dateKey(yesterdayDate);
+  const weekStart = new Date(today);
+  weekStart.setDate(weekStart.getDate() - 6);
+  const monthStart = `${todayKey.slice(0, 7)}-01`;
+  const allSessions = sessions.data ?? [];
+  const todaySessions = allSessions.filter((session) => session.date === todayKey);
+  const minutesFor = (rows: typeof allSessions) => rows.reduce((total, row) => total + row.duration_minutes, 0);
+  const yesterdayMinutes = minutesFor(allSessions.filter((session) => session.date === yesterdayKey));
+  const monthMinutes = minutesFor(allSessions.filter((session) => session.date >= monthStart && session.date <= todayKey));
+  const firstSessionDate = allSessions.reduce((first, session) => session.date < first ? session.date : first, todayKey);
+  const daysTracked = Math.max(1, Math.floor((today.getTime() - new Date(`${firstSessionDate}T00:00:00`).getTime()) / 86400000) + 1);
+  const dailyAverage = allSessions.length ? Math.round(minutesFor(allSessions) / daysTracked) : 0;
+  const longestSession = Math.max(0, ...allSessions.map((session) => session.duration_minutes));
+  const subjectStudy = (subjects.data ?? []).map((subject) => ({
+    ...subject,
+    studyMinutes: minutesFor(allSessions.filter((session) => session.subject_id === subject.id)),
+  })).sort((left, right) => right.studyMinutes - left.studyMinutes);
+  const chartDays = activityRange || Math.min(365, Math.max(14, daysTracked));
+  const activity = Array.from({ length: chartDays }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (chartDays - 1) + index);
+    const key = dateKey(date);
+    const dayTests = (tests.data ?? []).filter((test) => test.date === key);
+    const dayAttempts = (pyqAttempts.data ?? []).filter((attempt) => attempt.date === key);
+    const dayRevisions = (revisions.data ?? []).filter((revision) =>
+      (revision.last_revised ?? revision.created_at.slice(0, 10)) === key,
+    );
+    return {
+      date: key,
+      minutes: minutesFor(allSessions.filter((session) => session.date === key)),
+      tests: dayTests.length,
+      accuracy: dayTests.length
+        ? Math.round(dayTests.reduce((total, test) => total + test.accuracy, 0) / dayTests.length)
+        : null,
+      questions: dayAttempts.reduce((total, attempt) => total + attempt.total, 0),
+      revisions: dayRevisions.length,
+    };
+  });
+  const hasActivity = activity.some((day) => day.minutes || day.tests || day.questions || day.revisions);
+
+  const scrollToTimer = () => document.querySelector('[data-testid="study-timer"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -138,8 +201,31 @@ export default function Dashboard() {
         }
       />
 
-      <Countdown />
+      <div className="grid items-stretch gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <Countdown />
+        <section className="flex min-w-48 flex-col justify-center gap-2 rounded-2xl border border-[#0F5B78]/30 bg-[#0F5B78] p-4 text-white shadow-[0_8px_24px_rgba(15,91,120,0.14)]" data-testid="uppsc-countdown-card">
+          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/70">Also on your calendar</p>
+          <p className="font-serif text-lg font-semibold">UPPSC · 6 Dec 2026</p>
+          <Countdown exam="uppsc" compact />
+        </section>
+      </div>
       <StudyTimer />
+
+      <section className="grid gap-3 rounded-2xl border border-white/70 bg-white/55 p-4 shadow-[0_10px_28px_rgba(28,29,24,0.05)] backdrop-blur-2xl sm:grid-cols-2 lg:grid-cols-4" data-testid="dashboard-quick-access">
+        <button type="button" onClick={scrollToTimer} className="flex items-center gap-3 rounded-xl border border-white/80 bg-white/60 p-3 text-left transition-colors hover:bg-white">
+          <Play className="size-4 text-[#1D3A2C]" /><span className="text-sm font-medium">Start studying</span>
+        </button>
+        <button type="button" onClick={() => setLogOpen(true)} className="flex items-center gap-3 rounded-xl border border-white/80 bg-white/60 p-3 text-left transition-colors hover:bg-white">
+          <CalendarDays className="size-4 text-[#C8640E]" /><span className="text-sm font-medium">Schedule session</span>
+        </button>
+        <Link to="/tests" className="flex items-center gap-3 rounded-xl border border-white/80 bg-white/60 p-3 text-sm font-medium transition-colors hover:bg-white"><ListChecks className="size-4 text-[#0F5B78]" />Mock tests</Link>
+        <Link to="/professor" className="flex items-center gap-3 rounded-xl border border-white/80 bg-white/60 p-3 text-sm font-medium transition-colors hover:bg-white"><Sparkles className="size-4 text-[#6247AA]" />AI command center · OMR</Link>
+        <Link to="/pyq" className="flex items-center gap-3 rounded-xl border border-white/80 bg-white/60 p-3 text-sm font-medium transition-colors hover:bg-white"><Library className="size-4 text-[#1D3A2C]" />PYQ explorer</Link>
+        <Link to="/weakness" className="flex items-center gap-3 rounded-xl border border-white/80 bg-white/60 p-3 text-sm font-medium transition-colors hover:bg-white"><Radar className="size-4 text-[#B91C1C]" />Weak areas</Link>
+        <Link to="/revisions" className="flex items-center gap-3 rounded-xl border border-white/80 bg-white/60 p-3 text-sm font-medium transition-colors hover:bg-white"><RotateCcw className="size-4 text-[#B8860B]" />Revision queue</Link>
+        <Link to="/sessions" className="flex items-center gap-3 rounded-xl border border-white/80 bg-white/60 p-3 text-sm font-medium transition-colors hover:bg-white"><BookOpen className="size-4 text-[#843B62]" />Study calendar & log</Link>
+        <Link to="/insights" className="flex items-center gap-3 rounded-xl border border-white/80 bg-white/60 p-3 text-sm font-medium transition-colors hover:bg-white"><FileText className="size-4 text-[#0F5B78]" />Reports & intelligence</Link>
+      </section>
 
       {/* Stat band */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -181,6 +267,98 @@ export default function Dashboard() {
           testId="stat-syllabus"
         />
       </div>
+
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(18rem,1fr)]" data-testid="dashboard-study-summary">
+        <CardShell title="Study time, at a glance" overline="Real logged sessions" testId="dashboard-study-periods">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              ["Today", fmtMinutes(minutesFor(todaySessions))],
+              ["Yesterday", fmtMinutes(yesterdayMinutes)],
+              ["This week", fmtHours(ins?.this_week_minutes ?? minutesFor(allSessions.filter((session) => session.date >= dateKey(weekStart) && session.date <= todayKey)))],
+              ["This month", fmtHours(monthMinutes)],
+              ["All time", fmtHours(minutesFor(allSessions))],
+              ["Daily average", fmtMinutes(dailyAverage)],
+              ["Longest session", fmtMinutes(longestSession)],
+              ["Tests logged", String(tests.data?.length ?? 0)],
+              ["Average accuracy", tests.data?.length ? `${Math.round(tests.data.reduce((total, test) => total + test.accuracy, 0) / tests.data.length)}%` : "—"],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-xl border border-white/80 bg-white/55 p-3">
+                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#77796F]">{label}</p>
+                <p className="mt-1 font-serif text-xl font-semibold text-[#1C1D18]">{sessions.isPending ? "…" : value}</p>
+              </div>
+            ))}
+          </div>
+          {subjectStudy.length ? (
+            <div className="mt-5 space-y-2.5" data-testid="dashboard-subject-study-time">
+              {subjectStudy.filter((subject) => subject.studyMinutes > 0).slice(0, 6).map((subject) => (
+                <div key={subject.id} className="grid grid-cols-[5rem_minmax(0,1fr)_4rem] items-center gap-2 text-xs">
+                  <span className="font-mono text-[#5E6258]">{subject.short_name}</span>
+                  <div className="h-2 overflow-hidden rounded-full bg-[#E8E3D7]"><div className="h-full rounded-full" style={{ width: `${Math.min(100, subjectStudy[0].studyMinutes ? subject.studyMinutes / subjectStudy[0].studyMinutes * 100 : 0)}%`, backgroundColor: subject.color }} /></div>
+                  <span className="text-right font-mono text-[#5E6258]">{fmtHours(subject.studyMinutes)}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </CardShell>
+
+        <CardShell
+          title={`${activityRange || "All"}-day activity`}
+          overline="Actual portal activity"
+          testId="dashboard-14-day-activity"
+          action={
+            <div className="flex flex-wrap gap-1" aria-label="Activity date range">
+              {([7, 14, 30, 90, 0] as const).map((range) => (
+                <button
+                  key={range}
+                  type="button"
+                  data-testid={`activity-range-${range || "all"}`}
+                  aria-pressed={activityRange === range}
+                  onClick={() => setActivityRange(range)}
+                  className={cn(
+                    "rounded-md px-2 py-1 font-mono text-[10px] transition-colors",
+                    activityRange === range ? "bg-[#1D3A2C] text-white" : "text-[#5E6258] hover:bg-white/80",
+                  )}
+                >
+                  {range || "All"}
+                  {range ? "D" : ""}
+                </button>
+              ))}
+            </div>
+          }
+        >
+          {!hasActivity ? (
+            <EmptyState icon={<BarChart3 className="size-6" />} title="No activity in this period" hint="Study sessions, tests, PYQs, and revisions will appear here after they are recorded." testId="dashboard-activity-empty" />
+          ) : (
+            <div className="h-64" data-testid="dashboard-activity-chart">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={activity} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
+                  <CartesianGrid stroke="#E8E3D7" vertical={false} />
+                  <XAxis dataKey="date" tickFormatter={(value: string) => value.slice(5)} tick={{ fill: "#5E6258", fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="effort" tick={{ fill: "#5E6258", fontSize: 10 }} axisLine={false} tickLine={false} width={34} />
+                  <YAxis yAxisId="quality" orientation="right" domain={[0, 100]} tick={{ fill: "#5E6258", fontSize: 10 }} axisLine={false} tickLine={false} width={30} />
+                  <Tooltip formatter={(value: number, name: string) => [name === "Study minutes" ? fmtMinutes(value) : name === "Accuracy" ? `${value}%` : value, name]} />
+                  <Bar yAxisId="effort" dataKey="minutes" name="Study minutes" fill="#0F5B78" radius={[4, 4, 0, 0]} maxBarSize={18} />
+                  <Line yAxisId="quality" type="monotone" dataKey="accuracy" name="Accuracy" stroke="#C8640E" strokeWidth={2} dot={false} connectNulls={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+          {hasActivity ? <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[#5E6258]" data-testid="dashboard-activity-totals"><span>{activity.reduce((total, day) => total + day.tests, 0)} tests</span><span>{activity.reduce((total, day) => total + day.questions, 0)} PYQs attempted</span><span>{activity.reduce((total, day) => total + day.revisions, 0)} revision events</span><span>{ins?.streak_days ?? 0}-day streak</span><span>Accuracy line uses test dates only</span></div> : null}
+        </CardShell>
+      </section>
+
+      <CardShell title="Study allocation by subject" overline="All recorded sessions" testId="dashboard-study-subjects">
+        {subjectStudy.filter((subject) => subject.studyMinutes > 0).length ? (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {subjectStudy.filter((subject) => subject.studyMinutes > 0).map((subject) => (
+              <div key={subject.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/80 bg-white/55 p-3">
+                <SubjectChip short={subject.short_name} color={subject.color} />
+                <span className="font-mono text-xs text-[#5E6258]">{fmtHours(subject.studyMinutes)}</span>
+              </div>
+            ))}
+          </div>
+        ) : <p className="text-sm text-[#5E6258]">Study time by subject appears after sessions are logged.</p>}
+      </CardShell>
 
       {/* Main asymmetric grid */}
       <div className="grid gap-6 lg:grid-cols-12">

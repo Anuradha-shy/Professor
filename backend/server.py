@@ -31,6 +31,7 @@ from routers.revisions import router as revisions_router
 from routers.sessions import router as sessions_router
 from routers.subjects import router as subjects_router
 from routers.tests import router as tests_router
+from routers.mock_tests import router as mock_tests_router
 
 
 # Startup runs before the yield, shutdown after it. Add your own setup/teardown here.
@@ -82,6 +83,7 @@ api_router.include_router(sessions_router)
 api_router.include_router(goals_router)
 api_router.include_router(revisions_router)
 api_router.include_router(tests_router)
+api_router.include_router(mock_tests_router)
 api_router.include_router(insights_router)
 api_router.include_router(analytics_router)
 api_router.include_router(pyq_router)

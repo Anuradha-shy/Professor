@@ -80,7 +80,7 @@ export function StatCard({
     <div
       data-testid={testId}
       className={cn(
-        "rounded-xl border p-5 shadow-[0_1px_2px_rgba(28,29,24,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md",
+        "glass-surface rounded-xl border p-5 shadow-[0_1px_2px_rgba(28,29,24,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md",
         accent
           ? "border-[#E2DCCE] bg-[#FEF3E2]"
           : "border-[#E8E3D7] bg-white",
@@ -146,7 +146,7 @@ export function CardShell({
     <section
       data-testid={testId}
       className={cn(
-        "rounded-2xl border border-[#E8E3D7] bg-white p-6 shadow-[0_1px_2px_rgba(28,29,24,0.04)]",
+        "glass-surface rounded-2xl border border-[#E8E3D7] bg-white p-6 shadow-[0_1px_2px_rgba(28,29,24,0.04)]",
         className,
       )}
     >

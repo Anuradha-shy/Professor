@@ -1,0 +1,21 @@
+{
+  "name": "Professor UPSC Study Tracker",
+  "short_name": "Professor",
+  "description": "Private UPSC CSE study command centre",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FBF9F4",
+  "theme_color": "#1D3A2C",
+  "icons": [
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

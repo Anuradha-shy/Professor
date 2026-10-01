@@ -28,8 +28,9 @@ async def weakness() -> WeaknessOut:
         key = topic.strip()
         if not key:
             return
+        group_key = f"{key.casefold()}::{subject.strip().casefold()}"
         row = scores.setdefault(
-            key, {"topic": key, "subject": subject, "mock_hits": 0, "pyq_wrong": 0}
+            group_key, {"topic": key, "subject": subject, "mock_hits": 0, "pyq_wrong": 0}
         )
         row[source] += weight
         if subject and not row["subject"]:

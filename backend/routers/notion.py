@@ -12,12 +12,15 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from pymongo import UpdateOne
 
 from lib.db import db
 from models.tracker import (
     NotionEntry,
+    NotionContentBlock,
     NotionEntryUpdate,
     NotionLog,
+    NotionPageContent,
     NotionSchemaOut,
     NotionStatus,
     NotionSyncOut,
@@ -27,7 +30,7 @@ from routers.auth import require_auth
 
 router = APIRouter(prefix="/notion", tags=["notion"], dependencies=[Depends(require_auth)])
 
-NOTION_VERSION = "2022-06-28"
+NOTION_VERSION = os.environ.get("NOTION_VERSION", "2025-09-03")
 TITLE_PROP = "Name"
 
 
@@ -76,17 +79,41 @@ async def _database_id() -> str:
 
 
 async def _list_databases() -> list[dict]:
-    data = await _notion(
-        "POST", "/v1/search", {"filter": {"property": "object", "value": "database"}, "page_size": 50}
-    )
-    return [
-        {
-            "id": str(item["id"]),
-            "title": "".join(t.get("plain_text", "") for t in item.get("title", [])) or "Untitled",
+    databases: list[dict] = []
+    cursor: str | None = None
+    while True:
+        body: dict[str, Any] = {
+            "filter": {"property": "object", "value": "database"},
+            "page_size": 100,
         }
-        for item in data.get("results", [])
-        if item.get("object") == "database"
-    ]
+        if cursor:
+            body["start_cursor"] = cursor
+        data = await _notion("POST", "/v1/search", body)
+        databases.extend(
+            {
+                "id": str(item["id"]),
+                "title": "".join(t.get("plain_text", "") for t in item.get("title", [])) or "Untitled",
+            }
+            for item in data.get("results", [])
+            if item.get("object") == "database"
+        )
+        if not data.get("has_more"):
+            return databases
+        cursor = data.get("next_cursor")
+
+
+async def _data_source_id(database_id: str) -> str | None:
+    """Resolve a modern Notion data source, retaining compatibility with legacy databases."""
+    database = await _notion("GET", f"/v1/databases/{database_id}")
+    sources = database.get("data_sources") or []
+    configured = os.environ.get("NOTION_DATA_SOURCE_ID", "").strip()
+    if configured and any(str(source.get("id")) == configured for source in sources):
+        return configured
+    if sources:
+        return str(sources[0].get("id") or "") or None
+    if configured and database_id == await _database_id():
+        return configured
+    return None
 
 
 async def _remember(database_id: str, title: str) -> None:
@@ -114,6 +141,31 @@ def _plain(rich: list[dict]) -> str:
     return "".join(x.get("plain_text", "") for x in rich or [])
 
 
+def _property_text(value: Any) -> Any:
+    if isinstance(value, list):
+        return [_property_text(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    if "plain_text" in value:
+        return value.get("plain_text", "")
+    if "name" in value:
+        return value.get("name", "")
+    if "title" in value and isinstance(value["title"], list):
+        return _plain(value["title"])
+    if "rich_text" in value and isinstance(value["rich_text"], list):
+        return _plain(value["rich_text"])
+    for key in ("string", "number", "boolean", "date", "url", "email", "phone_number"):
+        if key in value:
+            return _property_text(value[key])
+    if "array" in value and isinstance(value["array"], list):
+        return [_property_text(item) for item in value["array"]]
+    if "start" in value and set(value).issubset({"start", "end", "time_zone"}):
+        start = str(value.get("start") or "")
+        end = str(value.get("end") or "")
+        return f"{start} – {end}" if end else start
+    return {key: _property_text(item) for key, item in value.items() if key not in ("id", "object")}
+
+
 def _flatten(page: dict, database_id: str = "", database_title: str = "") -> NotionEntry:
     """Notion page → flat, filterable row (keeps files/attachments as URLs)."""
     props: dict[str, Any] = page.get("properties", {})
@@ -129,6 +181,8 @@ def _flatten(page: dict, database_id: str = "", database_title: str = "") -> Not
             values[name] = _plain(p["rich_text"])
         elif t == "select":
             values[name] = (p["select"] or {}).get("name", "")
+        elif t == "status":
+            values[name] = (p.get("status") or {}).get("name", "")
         elif t == "multi_select":
             values[name] = [o["name"] for o in p.get("multi_select") or []]
         elif t == "date":
@@ -147,6 +201,22 @@ def _flatten(page: dict, database_id: str = "", database_title: str = "") -> Not
             values[name] = [i["name"] for i in images]
         elif t == "relation":
             values[name] = [r["id"] for r in p.get("relation") or []]
+        elif t in ("people", "created_by", "last_edited_by"):
+            people = p.get(t) or []
+            if isinstance(people, dict):
+                people = [people]
+            values[name] = [person.get("name", "") for person in people if person.get("name")]
+        elif t in ("created_time", "last_edited_time", "email", "phone_number"):
+            values[name] = p.get(t) or ""
+        elif t in ("formula", "rollup"):
+            values[name] = _property_text(p.get(t) or {})
+        elif t == "unique_id":
+            unique_id = p.get(t) or {}
+            values[name] = f"{unique_id.get('prefix') or ''}{unique_id.get('number', '')}"
+        elif t == "verification":
+            values[name] = (p.get(t) or {}).get("state", "")
+        elif t == "button":
+            values[name] = "Button"
     status = str(values.get("Status") or "")
     return NotionEntry(
         page_id=page["id"],
@@ -257,6 +327,9 @@ async def schema() -> NotionSchemaOut:
     try:
         dbid = await _database_id()
         data = await _notion("GET", f"/v1/databases/{dbid}")
+        source_id = await _data_source_id(dbid)
+        if source_id:
+            data = await _notion("GET", f"/v1/data_sources/{source_id}")
     except NotionApiError as exc:
         raise HTTPException(status_code=exc.status if exc.status != 502 else 503, detail=exc.message)
     options: dict[str, list[str]] = {}
@@ -285,12 +358,14 @@ async def pull(all_databases: bool = True) -> NotionSyncOut:
             ]
         entries: list[NotionEntry] = []
         for target in targets:
+            source_id = await _data_source_id(target["id"])
+            query_path = f"/v1/data_sources/{source_id}/query" if source_id else f"/v1/databases/{target['id']}/query"
             cursor: str | None = None
             while True:
                 body: dict[str, Any] = {"page_size": 100}
                 if cursor:
                     body["start_cursor"] = cursor
-                data = await _notion("POST", f"/v1/databases/{target['id']}/query", body)
+                data = await _notion("POST", query_path, body)
                 entries.extend(
                     _flatten(p, target["id"], target["title"])
                     for p in data.get("results", [])
@@ -304,19 +379,35 @@ async def pull(all_databases: bool = True) -> NotionSyncOut:
         await db.notion_logs.insert_one(NotionLog(action="pull", mode="live", ok=False, message=msg).model_dump())
         return NotionSyncOut(ok=False, mode="live", created=0, skipped=0, message=msg)
 
-    # Preserve locally-set read flags across refreshes.
-    read_pages = {
-        d["page_id"] for d in await db.notion_entries.find({"unread": False}).to_list(2000)
-    }
-    await db.notion_entries.delete_many({})
-    if entries:
-        docs = []
-        for e in entries:
-            doc = e.model_dump()
-            if e.page_id in read_pages:
-                doc["unread"] = False
-            docs.append(doc)
-        await db.notion_entries.insert_many(docs)
+    page_ids = [entry.page_id for entry in entries]
+    cached_docs = await db.notion_entries.find({"page_id": {"$in": page_ids}}).to_list(len(page_ids)) if page_ids else []
+    cached_by_page = {doc["page_id"]: doc for doc in cached_docs}
+    operations = []
+    for entry in entries:
+        doc = entry.model_dump()
+        cached = cached_by_page.get(entry.page_id)
+        if cached:
+            doc["unread"] = cached.get("unread", doc["unread"])
+            if cached.get("last_edited_time") == entry.last_edited_time:
+                doc["content"] = cached.get("content", [])
+                doc["content_blocks"] = cached.get("content_blocks", [])
+                doc["content_last_edited_time"] = cached.get("content_last_edited_time", "")
+                update = {"$set": doc}
+            else:
+                for field in ("content", "content_blocks", "content_last_edited_time"):
+                    doc.pop(field, None)
+                update = {
+                    "$set": doc,
+                    "$unset": {"content": "", "content_blocks": "", "content_last_edited_time": ""},
+                }
+        else:
+            update = {"$set": doc}
+        operations.append(UpdateOne({"page_id": entry.page_id}, update, upsert=True))
+    if operations:
+        await db.notion_entries.bulk_write(operations, ordered=False)
+    for target in targets:
+        current_ids = [entry.page_id for entry in entries if entry.database_id == target["id"]]
+        await db.notion_entries.delete_many({"database_id": target["id"], "page_id": {"$nin": current_ids}})
 
     msg = f"Pulled {len(entries)} entries from Notion."
     await db.notion_logs.insert_one(NotionLog(action="pull", mode="live", ok=True, message=msg).model_dump())
@@ -348,16 +439,105 @@ async def entries(
         query["priority"] = priority
     if unread_only:
         query["unread"] = True
-    docs = await db.notion_entries.find(query).sort([("last_edited_time", -1)]).to_list(600)
+    docs = await db.notion_entries.find(query).sort([("last_edited_time", -1)]).to_list(10_000)
     return [NotionEntry(**{k: v for k, v in d.items() if k != "_id"}) for d in docs]
+
+
+def _block_text(block: dict) -> str:
+    kind = block.get("type", "")
+    data = block.get(kind) or {}
+    if isinstance(data, dict):
+        rich_text = data.get("rich_text") or data.get("title") or []
+        text = _plain(rich_text) if isinstance(rich_text, list) else ""
+        if kind == "to_do":
+            return f"{'[x]' if data.get('checked') else '[ ]'} {text}".strip()
+        if kind == "child_page":
+            return str(data.get("title") or "")
+        if kind == "bookmark":
+            return str(data.get("url") or text)
+        if kind == "table_row":
+            return " | ".join(_plain(cell) for cell in data.get("cells", []))
+        return text
+    return ""
+
+
+async def _read_page_blocks(block_id: str, depth: int = 0) -> tuple[list[dict[str, Any]], list[dict]]:
+    if depth > 4:
+        return [], []
+    content: list[dict[str, Any]] = []
+    images: list[dict] = []
+    cursor: str | None = None
+    while True:
+        path = f"/v1/blocks/{block_id}/children?page_size=100"
+        if cursor:
+            path += f"&start_cursor={cursor}"
+        data = await _notion("GET", path)
+        for block in data.get("results", []):
+            kind = block.get("type", "")
+            line = _block_text(block)
+            if line.strip():
+                content.append({"type": kind, "text": line.strip(), "depth": depth})
+            if kind in ("image", "file"):
+                file_data = block.get(kind) or {}
+                url = (file_data.get("file") or file_data.get("external") or {}).get("url", "")
+                if url:
+                    images.append({
+                        "name": _plain(file_data.get("caption", [])) or kind.title(),
+                        "url": url,
+                    })
+            if block.get("has_children"):
+                nested_content, nested_images = await _read_page_blocks(str(block["id"]), depth + 1)
+                content.extend(nested_content)
+                images.extend(nested_images)
+        if not data.get("has_more"):
+            break
+        cursor = data.get("next_cursor")
+    return content, images
+
+
+@router.get("/entries/{page_id}/content", response_model=NotionPageContent)
+async def entry_content(page_id: str) -> NotionPageContent:
+    """Fetch and cache full page-body text and attachments when an entry is opened."""
+    cached = await db.notion_entries.find_one({"page_id": page_id})
+    if not cached:
+        raise HTTPException(status_code=404, detail="Entry not in the local mirror — pull first")
+    if cached.get("content") and cached.get("content_last_edited_time") == cached.get("last_edited_time"):
+        return NotionPageContent(
+            content=cached.get("content", []),
+            blocks=cached.get("content_blocks", []),
+            images=cached.get("images", []),
+        )
+    try:
+        blocks, block_images = await _read_page_blocks(page_id)
+    except NotionApiError as exc:
+        if cached.get("content") or cached.get("images"):
+            return NotionPageContent(
+                content=cached.get("content", []),
+                blocks=cached.get("content_blocks", []),
+                images=cached.get("images", []),
+            )
+        raise HTTPException(status_code=exc.status if exc.status != 502 else 503, detail=exc.message)
+    content = [block["text"] for block in blocks]
+    images = cached.get("images", []) + block_images
+    unique_images = list({item.get("url"): item for item in images if item.get("url")}.values())
+    await db.notion_entries.update_one(
+        {"page_id": page_id}, {"$set": {"content": content, "content_blocks": blocks, "content_last_edited_time": cached.get("last_edited_time", ""), "images": unique_images}}
+    )
+    return NotionPageContent(content=content, blocks=blocks, images=unique_images)
 
 
 @router.patch("/entries/{page_id}", response_model=NotionEntry)
 async def update_entry(page_id: str, input: NotionEntryUpdate) -> NotionEntry:
     """Edit a Notion entry — writes to Notion in real time, then re-mirrors it."""
+    existing = await db.notion_entries.find_one({"page_id": page_id})
     props: dict[str, Any] = {}
     if input.title is not None:
-        props[TITLE_PROP] = {"title": [{"text": {"content": input.title}}]}
+        values = (existing or {}).get("values", {})
+        title_prop = next(
+            (name for name in values if name.lower() in {"name", "article title"}),
+            next((name for name, value in values.items() if value == (existing or {}).get("title")), TITLE_PROP),
+        )
+        props[title_prop] = {"title": [{"text": {"content": input.title}}]}
     if input.status is not None:
         props["Status"] = {"select": {"name": input.status}}
     if input.priority is not None:
@@ -374,10 +554,14 @@ async def update_entry(page_id: str, input: NotionEntryUpdate) -> NotionEntry:
             raise HTTPException(status_code=exc.status if exc.status != 502 else 503, detail=exc.message)
         entry = _flatten(page)
         doc = entry.model_dump()
-        existing = await db.notion_entries.find_one({"page_id": page_id})
         if existing:
             doc["database_id"] = doc["database_id"] or existing.get("database_id", "")
             doc["database_title"] = existing.get("database_title", "")
+            doc["content"] = existing.get("content", [])
+            doc["content_blocks"] = existing.get("content_blocks", [])
+            doc["content_last_edited_time"] = (
+                entry.last_edited_time if existing.get("content") else ""
+            )
         if input.unread is not None:
             doc["unread"] = input.unread
         elif existing is not None:

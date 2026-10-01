@@ -61,6 +61,15 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("updated_at", DESCENDING)], name="updated_desc"),
     ],
     "omr_runs": [IndexModel([("date", DESCENDING)], name="date_desc")],
+    "mock_attempts": [
+        IndexModel([("id", ASCENDING)], name="id", unique=True),
+        IndexModel([("test_code", ASCENDING)], name="test_code", unique=True),
+        IndexModel([("test_date", ASCENDING)], name="test_date_asc"),
+    ],
+    "mock_test_files": [
+        IndexModel([("id", ASCENDING)], name="id", unique=True),
+        IndexModel([("attempt_id", ASCENDING), ("created_at", DESCENDING)], name="attempt_created_desc"),
+    ],
     "devices": [IndexModel([("id", ASCENDING)], name="id", unique=True)],
     "app_meta": [IndexModel([("key", ASCENDING)], name="key", unique=True)],
 }

@@ -12,6 +12,7 @@ import type {
   NotionDatabaseOption,
   NotionEntry,
   NotionLog,
+  NotionPageContent,
   NotionSchemaOut,
   NotionStatus,
   OmrResultOut,
@@ -20,6 +21,7 @@ import type {
   PyqMeta,
   PyqQuestion,
   PyqQuestionDetail,
+  PyqTopicTrend,
   Revision,
   Subject,
   StudySession,
@@ -43,6 +45,7 @@ export const qk = {
   notionEntries: ["notion", "entries"] as const,
   pyqMeta: ["pyq", "meta"] as const,
   pyqAttempts: ["pyq", "attempts"] as const,
+  pyqTrends: ["pyq", "trends"] as const,
   weakness: ["analytics", "weakness"] as const,
   heatmap: ["analytics", "heatmap"] as const,
   burndown: ["analytics", "burndown"] as const,
@@ -55,11 +58,14 @@ export const qk = {
 export const useSubjects = () =>
   useQuery({ queryKey: qk.subjects, queryFn: () => apiGet<Subject[]>("/subjects") });
 
-export const useSessions = () =>
-  useQuery({ queryKey: qk.sessions, queryFn: () => apiGet<StudySession[]>("/sessions") });
+export const useSessions = (limit = 200) =>
+  useQuery({
+    queryKey: [...qk.sessions, limit],
+    queryFn: () => apiGet<StudySession[]>(`/sessions?limit=${limit}`),
+  });
 
-export const useGoals = () =>
-  useQuery({ queryKey: qk.goals, queryFn: () => apiGet<Goal[]>("/goals") });
+export const useGoals = (enabled = true) =>
+  useQuery({ queryKey: qk.goals, queryFn: () => apiGet<Goal[]>("/goals"), enabled });
 
 export const useRevisions = () =>
   useQuery({ queryKey: qk.revisions, queryFn: () => apiGet<Revision[]>("/revisions") });
@@ -102,8 +108,39 @@ export const useNotionEntries = (params: Record<string, string | boolean>) => {
   return useQuery({
     queryKey: [...qk.notionEntries, qs],
     queryFn: () => apiGet<NotionEntry[]>(`/notion/entries${qs ? `?${qs}` : ""}`),
+    staleTime: 60_000,
+    placeholderData: (previous) => previous,
   });
 };
+
+export const useNotionPageContent = (pageId: string | null) =>
+  useQuery({
+    queryKey: ["notion", "entry-content", pageId],
+    initialData: () => {
+      if (!pageId) return undefined;
+      try {
+        const cached = localStorage.getItem(`professor.notion.page.${pageId}`);
+        return cached ? (JSON.parse(cached) as NotionPageContent) : undefined;
+      } catch {
+        return undefined;
+      }
+    },
+    initialDataUpdatedAt: 0,
+    queryFn: async () => {
+      const cacheKey = `professor.notion.page.${pageId}`;
+      try {
+        const content = await apiGet<NotionPageContent>(`/notion/entries/${pageId}/content`);
+        localStorage.setItem(cacheKey, JSON.stringify(content));
+        return content;
+      } catch (error) {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) return JSON.parse(cached) as NotionPageContent;
+        throw error;
+      }
+    },
+    enabled: Boolean(pageId),
+    staleTime: 5 * 60_000,
+  });
 
 export const usePyqMeta = () =>
   useQuery({ queryKey: qk.pyqMeta, queryFn: () => apiGet<PyqMeta>("/pyq/meta") });
@@ -128,6 +165,9 @@ export const usePyqQuestion = (id: string | null) =>
 
 export const usePyqAttempts = () =>
   useQuery({ queryKey: qk.pyqAttempts, queryFn: () => apiGet<PyqAttempt[]>("/pyq/attempts") });
+
+export const usePyqTrends = () =>
+  useQuery({ queryKey: qk.pyqTrends, queryFn: () => apiGet<PyqTopicTrend[]>("/pyq/trends") });
 
 export const useWeakness = () =>
   useQuery({ queryKey: qk.weakness, queryFn: () => apiGet<WeaknessOut>("/analytics/weakness") });

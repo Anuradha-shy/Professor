@@ -1,25 +1,27 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { apiGet } from "@/lib/api";
-import type { ForecastOut } from "@/lib/types";
+const EXAMS = {
+  upsc: { label: "UPSC CSE Prelims", date: "24 May 2027", target: new Date("2027-05-24T09:30:00+05:30").getTime() },
+  uppsc: { label: "UPPSC Prelims", date: "6 Dec 2026", target: new Date("2026-12-06T09:30:00+05:30").getTime() },
+} as const;
 
-const PRELIMS = new Date("2027-05-24T09:30:00+05:30").getTime();
-
-/** Real-time countdown to UPSC CSE Prelims, 24 May 2027 (server-anchored days). */
-export default function Countdown() {
+/** Wall-clock countdown to an exam date; remains accurate after refresh and navigation. */
+export default function Countdown({
+  exam = "upsc",
+  compact = false,
+}: {
+  exam?: keyof typeof EXAMS;
+  compact?: boolean;
+}) {
   const [now, setNow] = useState(() => Date.now());
-  const server = useQuery({
-    queryKey: ["analytics", "forecast"],
-    queryFn: () => apiGet<ForecastOut>("/analytics/forecast"),
-  });
+  const info = EXAMS[exam];
 
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
   }, []);
 
-  const diff = Math.max(0, PRELIMS - now);
-  const days = server.data?.days_to_prelims ?? Math.floor(diff / 86400000);
+  const diff = Math.max(0, info.target - now);
+  const days = Math.floor(diff / 86400000);
   const hours = Math.floor((diff % 86400000) / 3600000);
   const mins = Math.floor((diff % 3600000) / 60000);
   const secs = Math.floor((diff % 60000) / 1000);
@@ -31,6 +33,23 @@ export default function Countdown() {
     { label: "sec", value: secs },
   ];
 
+  if (compact) {
+    return (
+      <div
+        data-testid={`${exam}-global-countdown`}
+        className="flex min-w-0 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-1.5 text-white shadow-inner backdrop-blur-xl"
+        aria-label={`${info.label}: ${days} days remaining`}
+      >
+        <span className="hidden font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-[#E8C79A] sm:inline">
+          {exam === "upsc" ? "CSE" : "UPPSC"}
+        </span>
+        <span className="font-mono text-xs font-semibold tabular-nums sm:text-sm">
+          {days}d {String(hours).padStart(2, "0")}:{String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
+        </span>
+      </div>
+    );
+  }
+
   return (
     <section
       data-testid="prelims-countdown"
@@ -40,10 +59,10 @@ export default function Countdown() {
       <div className="relative flex flex-wrap items-center justify-between gap-6">
         <div>
           <p className="font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-[#E8C79A]">
-            Final attempt · Prelims 24 May 2027
+            Final attempt · {info.label} · {info.date}
           </p>
           <p className="mt-1 font-serif text-2xl font-semibold tracking-tight">
-            Every hour counts from here
+            {days > 0 ? `${days} days to go` : "Exam day is here"}
           </p>
         </div>
         <div className="flex items-end gap-3" data-testid="countdown-units">

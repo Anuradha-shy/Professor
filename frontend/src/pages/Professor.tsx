@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Bot, ScanLine, Send, Sparkles, Trash2, Upload, User } from "lucide-react";
+import { Bot, CheckCircle2, ScanLine, Send, Sparkles, Trash2, Upload, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ const PROMPTS = [
   "Build me a 7-day plan for my weakest subject",
   "Log 90 minutes of GS-III Economy for me",
 ];
+const LETTERS = ["a", "b", "c", "d"];
 
 export default function Professor() {
   const qc = useQueryClient();
@@ -84,9 +85,10 @@ export default function Professor() {
     },
     onSuccess: (res) => {
       setOmrResult(res);
+      setOmrLabel(res.label);
       toast.success(
         res.evaluated
-          ? `Evaluated: ${res.correct} correct, ${res.wrong} wrong (${res.accuracy}%)`
+          ? `Provisional AI read: ${res.correct} correct, ${res.wrong} wrong (${res.accuracy}%). Review before saving.`
           : `Read ${res.detected_count} marked answers`,
       );
       qc.invalidateQueries({ queryKey: ["ai", "omr", "runs"] });
@@ -95,6 +97,34 @@ export default function Professor() {
     },
     onError: (error) => toast.error(errDetail(error)),
   });
+
+  const reviewOmr = useMutation({
+    mutationFn: async () => {
+      if (!omrResult) throw new Error("Scan an OMR sheet first");
+      const response = await fetch(`/api/ai/omr/runs/${omrResult.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answers: omrResult.detected, answer_key: omrKey }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.detail ?? `Review save failed (${response.status})`);
+      return result as OmrResultOut;
+    },
+    onSuccess: (result) => {
+      setOmrResult(result);
+      toast.success(result.evaluated ? `Reviewed score saved · ${result.score}/${result.max_score}` : "Reviewed answers saved. Add an answer key to score.");
+      for (const key of [["ai", "omr", "runs"], ["tests"], ["insights"], ["analytics"], ["ai"]]) {
+        void qc.invalidateQueries({ queryKey: key });
+      }
+    },
+    onError: (error) => toast.error(errDetail(error)),
+  });
+
+  const selectOmrRun = (run: OmrResultOut) => {
+    setOmrResult(run);
+    setOmrLabel(run.label);
+    setOmrKey(Object.entries(run.answer_key ?? {}).map(([number, answer]) => `${number}:${answer.toUpperCase()}`).join(", "));
+  };
 
   const submit = (text: string) => {
     const message = text.trim();
@@ -293,24 +323,48 @@ export default function Professor() {
                 )}
               </Button>
               {omrResult ? (
-                <div data-testid="omr-result" className="rounded-xl bg-[#FEF3E2] p-3 text-xs text-[#8A3D04]">
-                  <p className="font-mono font-semibold">
-                    {omrResult.detected_count} answers read
-                    {omrResult.evaluated
-                      ? ` · ${omrResult.correct}✓ ${omrResult.wrong}✗ · ${omrResult.accuracy}%`
-                      : " · add a key to score"}
-                  </p>
-                  {omrResult.notes ? <p className="mt-1">{omrResult.notes}</p> : null}
+                <div data-testid="omr-result" className="grid gap-3 rounded-xl bg-[#FEF3E2] p-3 text-xs text-[#8A3D04]">
+                  <div>
+                    <p className="font-mono font-semibold">{omrResult.detected_count} answers read{omrResult.evaluated ? ` · ${omrResult.correct}✓ ${omrResult.wrong}✗ · ${omrResult.accuracy}%${omrResult.reviewed ? " · reviewed" : " · provisional"}` : " · add a key to score"}</p>
+                    {omrResult.notes ? <p className="mt-1">{omrResult.notes}</p> : null}
+                  </div>
+                  <p className="font-medium">Review detected answers (blank means unanswered)</p>
+                  <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5" data-testid="omr-answer-review">
+                    {Array.from({ length: 100 }, (_, index) => index + 1).map((question) => {
+                      const number = String(question);
+                      return (
+                        <label key={question} className="flex min-w-0 items-center gap-1 rounded border border-[#E8D9BE] bg-white px-1.5 py-1">
+                          <span className="font-mono text-[10px]">{number.padStart(2, "0")}</span>
+                          <select
+                            aria-label={`Answer for question ${question}`}
+                            data-testid={`omr-answer-${question}`}
+                            value={omrResult.detected[number] ?? ""}
+                            onChange={(event) => setOmrResult((current) => current ? {
+                              ...current,
+                              detected: { ...current.detected, [number]: event.target.value },
+                            } : current)}
+                            className="min-w-0 flex-1 bg-transparent text-xs text-[#1C1D18]"
+                          >
+                            <option value="">–</option>
+                            {LETTERS.map((answer) => <option key={answer} value={answer}>{answer.toUpperCase()}</option>)}
+                          </select>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <Button size="sm" disabled={reviewOmr.isPending} onClick={() => reviewOmr.mutate()} className="bg-[#1D3A2C] text-white hover:bg-[#2F5E48]">
+                    <CheckCircle2 className="size-4" /> {reviewOmr.isPending ? "Saving review…" : omrKey.trim() ? "Save reviewed answers & score" : "Save reviewed answers"}
+                  </Button>
                 </div>
               ) : null}
               {(omrRuns.data ?? []).length > 0 ? (
                 <ul className="space-y-1.5 text-xs" data-testid="omr-runs">
                   {(omrRuns.data ?? []).slice(0, 4).map((r, i) => (
-                    <li key={`${r.label}-${i}`} className="flex justify-between gap-2 rounded-lg border border-[#F0EDE5] px-3 py-2">
-                      <span className="truncate text-[#383A34]">{r.label}</span>
-                      <span className="shrink-0 font-mono text-[#5E6258]">
-                        {r.evaluated ? `${r.accuracy}%` : `${r.detected_count} read`}
-                      </span>
+                    <li key={r.id || `${r.label}-${i}`}>
+                      <button type="button" onClick={() => selectOmrRun(r)} className="flex w-full justify-between gap-2 rounded-lg border border-[#F0EDE5] px-3 py-2 text-left hover:bg-[#FBF9F4]">
+                        <span className="truncate text-[#383A34]">{r.label}</span>
+                        <span className="shrink-0 font-mono text-[#5E6258]">{r.evaluated ? `${r.accuracy}%` : `${r.detected_count} read`}</span>
+                      </button>
                     </li>
                   ))}
                 </ul>

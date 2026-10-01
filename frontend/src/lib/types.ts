@@ -79,6 +79,74 @@ export interface TestRecord {
   created_at: string;
 }
 
+export interface ScheduledMock {
+  test_code: string;
+  date: string;
+  series: string;
+  kind: string;
+  subject: string;
+  scope: string;
+  access_at: string;
+  start_at: string;
+  end_at: string;
+  duration_minutes: number;
+  question_count: number;
+  state: "scheduled" | "available" | "unlocked" | "active" | "submitted" | "evaluated" | "missed";
+  attempt_id: string | null;
+}
+
+export interface MockQuestionResult {
+  question: number;
+  selected: string;
+  correct_answer: string;
+  result: "correct" | "wrong" | "blank";
+  subject?: string;
+  topic?: string;
+}
+
+export interface MockEvaluation {
+  total: number;
+  correct: number;
+  wrong: number;
+  blank: number;
+  score: number;
+  max_score: number;
+  accuracy: number;
+  question_results: MockQuestionResult[];
+}
+
+export interface MockAttempt {
+  id: string;
+  test_code: string;
+  test_date: string;
+  name: string;
+  answers: Record<string, string>;
+  detected_answers: Record<string, string>;
+  detected_key?: Record<string, string>;
+  official_key: Record<string, string>;
+  question_tags: Record<string, Record<string, string>>;
+  round1_count: number;
+  round1_seconds: number;
+  round2_count: number;
+  round2_seconds: number;
+  state: string;
+  created_at: string;
+  submitted_at: string | null;
+  evaluation?: MockEvaluation;
+  analysis?: { report: string; provider: string; created_at: string };
+  detected_answers_notes?: string;
+  detected_key_notes?: string;
+}
+
+export interface MockStoredFile {
+  id: string;
+  kind: "question-paper" | "omr-sheet" | "official-key";
+  filename: string;
+  content_type: string;
+  size: number;
+  created_at: string;
+}
+
 export interface DayPoint {
   date: string;
   minutes: number;
@@ -174,8 +242,15 @@ export interface NotionEntry {
   pyq_history: string;
   last_updated: string;
   images: NotionImage[];
+  content: string[];
   last_edited_time: string;
   values: Record<string, unknown>;
+}
+
+export interface NotionPageContent {
+  content: string[];
+  blocks?: { type: string; text: string; depth: number }[];
+  images: NotionImage[];
 }
 
 // --- pyq bank ---
@@ -192,6 +267,7 @@ export interface PyqQuestion {
   current_affairs: boolean;
   answer: string;
   cancelled: boolean;
+  official_paper_url: string;
 }
 
 export interface PyqQuestionDetail extends PyqQuestion {
@@ -226,6 +302,14 @@ export interface PyqMeta {
   per_year: Record<string, number>;
   per_subject: Record<string, number>;
   difficulties: string[];
+}
+
+export interface PyqTopicTrend {
+  subtopic: string;
+  all_2014_25: number;
+  years_present: number;
+  early_2014_18: number;
+  recent_2021_25: number;
 }
 
 export interface PyqResultItem {
@@ -327,11 +411,14 @@ export interface AiSession {
 }
 
 export interface OmrResultOut {
+  id: string;
   label: string;
   provider: string;
   detected: Record<string, string>;
+  answer_key: Record<string, string>;
   detected_count: number;
   evaluated: boolean;
+  reviewed: boolean;
   correct: number;
   wrong: number;
   blank: number;

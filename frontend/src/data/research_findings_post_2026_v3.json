@@ -1,0 +1,36 @@
+{
+  "cutoff": "2026-05-25",
+  "purpose": "Current mock/trend layer for UPSC CSE Prelims 2027 GS Paper-I",
+  "rules": [
+    "Historical PYQs are structural priors; they are not post-2026 mock evidence.",
+    "Only mock/test/quiz evidence dated 2026-05-25 or later enters the current mock layer.",
+    "Provider marketing claims are stored as provider claims, not predictive validity.",
+    "Gated or unseen question text is never inferred.",
+    "Official UPSC paper is the source-of-record for the 2026 exam.",
+    "Question source attribution is never promoted to UPSC setter provenance unless independently proven; UPSC does not publish setter-source attribution."
+  ],
+  "latest_2026_style_signals": {
+    "coded_statement_family": 55,
+    "direct_family": 19,
+    "count_family": 7,
+    "relationship_inference_family": 7,
+    "matching_family": 8,
+    "scenario_case_family": 4,
+    "note": "External analytical buckets; not official UPSC labels."
+  },
+  "ecosystem_signals": [
+    "ForumIAS: sectional → comprehensive → simulator → current affairs layers; its public page states 20–25 current-affairs questions per full test.",
+    "PMF IAS: large integrated ecosystem with static, current-affairs and 20 full-length simulations.",
+    "Testbook: high-fragmentation catalog with 123 GS chapter tests, 24 CA tests, 5 subject tests and 20 full tests.",
+    "ClearIAS: NCERT + standard-textbook + CA + full-topic architecture across 40 GS mocks.",
+    "Drishti: 15-month current-affairs coverage, static + conceptual application, bilingual delivery, and open mock metadata.",
+    "Indian Express: recurring public weekly and subject quizzes provide a current topic pulse; they are not treated as full mock evidence."
+  ],
+  "engine_implications": [
+    "Preserve primary subject and current-affairs linkage as separate dimensions.",
+    "Maintain a high share of multi-claim judgement formats, but vary surface architecture to avoid template mimicry.",
+    "Create difficulty through conceptual depth, ambiguity, statement load, cross-topic integration and elimination burden—not obscure trivia alone.",
+    "Use post-2026 public mock ecosystem for coverage gaps and failure-mode analysis, not for deterministic predictions.",
+    "Keep a fresh current-affairs layer with recency windows and primary-source verification."
+  ]
+}

@@ -136,6 +136,50 @@
   }
 }
 
+.ios-portal {
+  min-height: 100svh;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.ios-portal header.sticky {
+  padding-top: env(safe-area-inset-top);
+}
+
+.glass-surface {
+  border-color: rgba(255, 255, 255, 0.76) !important;
+  background-color: rgba(255, 255, 255, 0.62) !important;
+  background-image: linear-gradient(145deg, rgba(255, 255, 255, 0.48), rgba(255, 255, 255, 0.16));
+  -webkit-backdrop-filter: blur(24px) saturate(1.35);
+  backdrop-filter: blur(24px) saturate(1.35);
+  box-shadow: 0 12px 36px rgba(28, 29, 24, 0.055), inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+[data-testid="notion-reader"] [data-testid="study-timer"] {
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  background-color: rgba(255, 255, 255, 0.07) !important;
+  background-image: none;
+  box-shadow: none;
+}
+
+[data-testid="notion-reader"] [data-testid="timer-display"],
+[data-testid="notion-reader"] [data-testid="timer-daily-total"] {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+[data-testid="notion-reader"] [data-testid="timer-subject-select"],
+[data-testid="notion-reader"] [data-testid="timer-topic-input"],
+[data-testid="notion-reader"] [data-testid="timer-notification-toggle"] {
+  border-color: rgba(255, 255, 255, 0.22);
+  background-color: rgba(255, 255, 255, 0.06);
+  color: white;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-surface {
+    scroll-behavior: auto;
+  }
+}
+
 /* Archival paper stipple — 3.5% fractal noise fixed to the page background. */
 body::before {
   content: "";

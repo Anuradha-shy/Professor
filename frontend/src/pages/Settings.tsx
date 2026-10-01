@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { CheckCircle2, Cloud, KeyRound, Lock, RefreshCw, RotateCcw, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -14,17 +14,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { CardShell, PageHeader } from "@/components/kit";
 import { apiPatch, apiPost } from "@/lib/api";
-import { errDetail, fmtDate, fmtMinutes } from "@/lib/format";
+import { errDetail, fmtMinutes } from "@/lib/format";
 import {
   useDevices,
   useGoals,

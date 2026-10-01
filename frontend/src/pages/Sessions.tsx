@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Clock, Plus, Trash2 } from "lucide-react";
+import { Clock, Download, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -13,9 +13,10 @@ import {
 } from "@/components/ui/table";
 import SessionDialog from "@/components/SessionDialog";
 import { EmptyState, PageHeader, StatCard, SubjectChip } from "@/components/kit";
-import { apiDelete } from "@/lib/api";
-import { fmtDate, fmtMinutes } from "@/lib/format";
+import { apiDelete, apiGet } from "@/lib/api";
+import { fmtDate, fmtMinutes, todayISO } from "@/lib/format";
 import { useSessions, useSubjects } from "@/lib/queries";
+import type { StudySession } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export default function Sessions() {
@@ -36,6 +37,28 @@ export default function Sessions() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Delete failed"),
   });
 
+  const exportCsv = useMutation({
+    mutationFn: () => apiGet<StudySession[]>(
+      `/sessions?limit=10000${filter === "all" ? "" : `&subject_id=${encodeURIComponent(filter)}`}`,
+    ),
+    onSuccess: (rows) => {
+      const columns = ["date", "subject", "topic", "duration_minutes", "notes"] as const;
+      const escape = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
+      const csv = [
+        columns.map(escape).join(","),
+        ...rows.map((session) => [session.date, session.subject_name, session.topic, session.duration_minutes, session.notes].map(escape).join(",")),
+      ].join("\r\n");
+      const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `study-log-${filter === "all" ? "all" : filter}-${todayISO()}.csv`;
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success(`Exported ${rows.length} study sessions`);
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Export failed"),
+  });
+
   const filtered = useMemo(() => {
     const all = sessions.data ?? [];
     return filter === "all" ? all : all.filter((s) => s.subject_id === filter);
@@ -50,13 +73,18 @@ export default function Sessions() {
         title="Study Log"
         description="Every session you log — filter by subject, keep notes, watch the streak compound."
         actions={
-          <Button
-            data-testid="log-session-btn"
-            onClick={() => setLogOpen(true)}
-            className="bg-[#C8640E] text-white hover:bg-[#A85309]"
-          >
-            <Plus className="size-4" /> Log session
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button data-testid="export-sessions-btn" variant="outline" disabled={exportCsv.isPending} onClick={() => exportCsv.mutate()}>
+              <Download className="size-4" /> {exportCsv.isPending ? "Preparing…" : "Export CSV"}
+            </Button>
+            <Button
+              data-testid="log-session-btn"
+              onClick={() => setLogOpen(true)}
+              className="bg-[#C8640E] text-white hover:bg-[#A85309]"
+            >
+              <Plus className="size-4" /> Log session
+            </Button>
+          </div>
         }
       />
 

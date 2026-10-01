@@ -1,0 +1,237 @@
+{
+  "version": "V8.6.1-CONTINUED",
+  "source": "Portal 1,300 PYQs (2014–2026) + supplied Mains trend tables (2013–2026)",
+  "note": "Mains values are source-table tagged marks. They are not necessarily unique paper totals where the source uses composite or overlapping topic labels. Missing Prelims values mean no separate portal tag, not zero questions.",
+  "subjects": [
+    {
+      "subject": "Indian Polity",
+      "gs": "GS-II",
+      "prelimsQuestions": 181,
+      "prelimsTagStatus": "SEPARATE_TAG",
+      "mainsTaggedMarks2013_2026": 1490.0,
+      "mainsAverageTaggedMarksPerYear": 106.4,
+      "mains2026TaggedMarks": 90.0,
+      "mainsTopicRows": 6
+    },
+    {
+      "subject": "Governance",
+      "gs": "GS-II",
+      "prelimsQuestions": null,
+      "prelimsTagStatus": "NOT_SEPARATELY_TAGGED",
+      "mainsTaggedMarks2013_2026": 595.0,
+      "mainsAverageTaggedMarksPerYear": 42.5,
+      "mains2026TaggedMarks": 25.0,
+      "mainsTopicRows": 3
+    },
+    {
+      "subject": "Social Justice",
+      "gs": "GS-II",
+      "prelimsQuestions": null,
+      "prelimsTagStatus": "NOT_SEPARATELY_TAGGED",
+      "mainsTaggedMarks2013_2026": 670.0,
+      "mainsAverageTaggedMarksPerYear": 47.9,
+      "mains2026TaggedMarks": 15.0,
+      "mainsTopicRows": 3
+    },
+    {
+      "subject": "International Relations",
+      "gs": "GS-II",
+      "prelimsQuestions": 15,
+      "prelimsTagStatus": "SEPARATE_TAG",
+      "mainsTaggedMarks2013_2026": 757.5,
+      "mainsAverageTaggedMarksPerYear": 54.1,
+      "mains2026TaggedMarks": 50.0,
+      "mainsTopicRows": 3
+    },
+    {
+      "subject": "Economy",
+      "gs": "GS-III",
+      "prelimsQuestions": 260,
+      "prelimsTagStatus": "SEPARATE_TAG",
+      "mainsTaggedMarks2013_2026": 835.0,
+      "mainsAverageTaggedMarksPerYear": 59.6,
+      "mains2026TaggedMarks": 50.0,
+      "mainsTopicRows": 4
+    },
+    {
+      "subject": "Agriculture",
+      "gs": "GS-III",
+      "prelimsQuestions": null,
+      "prelimsTagStatus": "NOT_SEPARATELY_TAGGED",
+      "mainsTaggedMarks2013_2026": 695.0,
+      "mainsAverageTaggedMarksPerYear": 49.6,
+      "mains2026TaggedMarks": 50.0,
+      "mainsTopicRows": 5
+    },
+    {
+      "subject": "Environment & Ecology",
+      "gs": "GS-III",
+      "prelimsQuestions": 222,
+      "prelimsTagStatus": "SEPARATE_TAG",
+      "mainsTaggedMarks2013_2026": 440.0,
+      "mainsAverageTaggedMarksPerYear": 31.4,
+      "mains2026TaggedMarks": 25.0,
+      "mainsTopicRows": 1
+    },
+    {
+      "subject": "Disaster Management",
+      "gs": "GS-III",
+      "prelimsQuestions": null,
+      "prelimsTagStatus": "NOT_SEPARATELY_TAGGED",
+      "mainsTaggedMarks2013_2026": 255.0,
+      "mainsAverageTaggedMarksPerYear": 18.2,
+      "mains2026TaggedMarks": 25.0,
+      "mainsTopicRows": 1
+    },
+    {
+      "subject": "Science & Technology",
+      "gs": "GS-III",
+      "prelimsQuestions": 180,
+      "prelimsTagStatus": "SEPARATE_TAG",
+      "mainsTaggedMarks2013_2026": 545.0,
+      "mainsAverageTaggedMarksPerYear": 38.9,
+      "mains2026TaggedMarks": 40.0,
+      "mainsTopicRows": 2
+    },
+    {
+      "subject": "Internal Security",
+      "gs": "GS-III",
+      "prelimsQuestions": null,
+      "prelimsTagStatus": "NOT_SEPARATELY_TAGGED",
+      "mainsTaggedMarks2013_2026": 725.0,
+      "mainsAverageTaggedMarksPerYear": 51.8,
+      "mains2026TaggedMarks": 35.0,
+      "mainsTopicRows": 4
+    },
+    {
+      "subject": "Geography",
+      "gs": "GS-I",
+      "prelimsQuestions": 137,
+      "prelimsTagStatus": "SEPARATE_TAG",
+      "mainsTaggedMarks2013_2026": 1205.0,
+      "mainsAverageTaggedMarksPerYear": 86.1,
+      "mains2026TaggedMarks": 100.0,
+      "mainsTopicRows": 4
+    },
+    {
+      "subject": "Art & Culture",
+      "gs": "GS-I",
+      "prelimsQuestions": 69,
+      "prelimsTagStatus": "SEPARATE_TAG",
+      "mainsTaggedMarks2013_2026": 395.0,
+      "mainsAverageTaggedMarksPerYear": 28.2,
+      "mains2026TaggedMarks": 25.0,
+      "mainsTopicRows": 1
+    },
+    {
+      "subject": "History (unclassified tag)",
+      "gs": "GS-I",
+      "prelimsQuestions": 141,
+      "prelimsTagStatus": "SEPARATE_TAG",
+      "mainsTaggedMarks2013_2026": 402.5,
+      "mainsAverageTaggedMarksPerYear": 28.8,
+      "mains2026TaggedMarks": 20.0,
+      "mainsTopicRows": 1
+    },
+    {
+      "subject": "Ancient History",
+      "gs": "GS-I",
+      "prelimsQuestions": 1,
+      "prelimsTagStatus": "SEPARATE_TAG",
+      "mainsTaggedMarks2013_2026": 0,
+      "mainsAverageTaggedMarksPerYear": null,
+      "mains2026TaggedMarks": null,
+      "mainsTopicRows": 0
+    },
+    {
+      "subject": "Medieval History",
+      "gs": "GS-I",
+      "prelimsQuestions": 5,
+      "prelimsTagStatus": "SEPARATE_TAG",
+      "mainsTaggedMarks2013_2026": 0,
+      "mainsAverageTaggedMarksPerYear": null,
+      "mains2026TaggedMarks": null,
+      "mainsTopicRows": 0
+    },
+    {
+      "subject": "Modern History",
+      "gs": "GS-I",
+      "prelimsQuestions": 6,
+      "prelimsTagStatus": "SEPARATE_TAG",
+      "mainsTaggedMarks2013_2026": 0,
+      "mainsAverageTaggedMarksPerYear": null,
+      "mains2026TaggedMarks": null,
+      "mainsTopicRows": 0
+    },
+    {
+      "subject": "Post-Independence",
+      "gs": "GS-I",
+      "prelimsQuestions": null,
+      "prelimsTagStatus": "NOT_SEPARATELY_TAGGED",
+      "mainsTaggedMarks2013_2026": 120.0,
+      "mainsAverageTaggedMarksPerYear": 8.6,
+      "mains2026TaggedMarks": 30.0,
+      "mainsTopicRows": 1
+    },
+    {
+      "subject": "World History",
+      "gs": "GS-I",
+      "prelimsQuestions": null,
+      "prelimsTagStatus": "NOT_SEPARATELY_TAGGED",
+      "mainsTaggedMarks2013_2026": 217.5,
+      "mainsAverageTaggedMarksPerYear": 15.5,
+      "mains2026TaggedMarks": 0.0,
+      "mainsTopicRows": 1
+    },
+    {
+      "subject": "Indian Society",
+      "gs": "GS-I",
+      "prelimsQuestions": null,
+      "prelimsTagStatus": "NOT_SEPARATELY_TAGGED",
+      "mainsTaggedMarks2013_2026": 1160.0,
+      "mainsAverageTaggedMarksPerYear": 82.9,
+      "mains2026TaggedMarks": 75.0,
+      "mainsTopicRows": 5
+    },
+    {
+      "subject": "Current Affairs",
+      "gs": "Cross-cutting",
+      "prelimsQuestions": 82,
+      "prelimsTagStatus": "SEPARATE_TAG",
+      "mainsTaggedMarks2013_2026": 0,
+      "mainsAverageTaggedMarksPerYear": null,
+      "mains2026TaggedMarks": null,
+      "mainsTopicRows": 0
+    },
+    {
+      "subject": "Sports",
+      "gs": "Cross-cutting",
+      "prelimsQuestions": 1,
+      "prelimsTagStatus": "SEPARATE_TAG",
+      "mainsTaggedMarks2013_2026": 0,
+      "mainsAverageTaggedMarksPerYear": null,
+      "mains2026TaggedMarks": null,
+      "mainsTopicRows": 0
+    },
+    {
+      "subject": "GS-IV Ethics",
+      "gs": "GS-IV",
+      "prelimsQuestions": null,
+      "prelimsTagStatus": "NOT_SEPARATELY_TAGGED",
+      "mainsTaggedMarks2013_2026": 1795.0,
+      "mainsAverageTaggedMarksPerYear": 128.2,
+      "mains2026TaggedMarks": 130.0,
+      "mainsTopicRows": 10
+    },
+    {
+      "subject": "GS-IV Case Studies",
+      "gs": "GS-IV",
+      "prelimsQuestions": null,
+      "prelimsTagStatus": "NOT_SEPARATELY_TAGGED",
+      "mainsTaggedMarks2013_2026": 1705.0,
+      "mainsAverageTaggedMarksPerYear": 121.8,
+      "mains2026TaggedMarks": 100.0,
+      "mainsTopicRows": 5
+    }
+  ]
+}

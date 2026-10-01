@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CheckCircle2, ExternalLink, Library, XCircle } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, CheckCircle2, ExternalLink, Library, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,9 +18,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { EmptyState, PageHeader, StatCard } from "@/components/kit";
+import { Input } from "@/components/ui/input";
 import { apiPost } from "@/lib/api";
 import { errDetail, fmtDate } from "@/lib/format";
-import { usePyqAttempts, usePyqMeta, usePyqQuestion, usePyqQuestions } from "@/lib/queries";
+import { usePyqAttempts, usePyqMeta, usePyqQuestion, usePyqQuestions, usePyqTrends } from "@/lib/queries";
 import type { PyqAttempt } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -30,11 +31,14 @@ export default function Pyq() {
   const qc = useQueryClient();
   const meta = usePyqMeta();
   const attempts = usePyqAttempts();
+  const trends = usePyqTrends();
   const [year, setYear] = useState<number | null>(null);
   const [subject, setSubject] = useState("");
   const [marks, setMarks] = useState<Record<string, string>>({});
   const [result, setResult] = useState<PyqAttempt | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [trendSearch, setTrendSearch] = useState("");
+  const [showAllTrends, setShowAllTrends] = useState(false);
   const detail = usePyqQuestion(openId);
   const questions = usePyqQuestions(year, subject);
 
@@ -42,6 +46,14 @@ export default function Pyq() {
   const answered = useMemo(
     () => Object.values(marks).filter(Boolean).length,
     [marks],
+  );
+  const matchedTrends = (trends.data ?? []).filter((trend) =>
+    trend.subtopic.toLowerCase().includes(trendSearch.trim().toLowerCase()),
+  );
+  const visibleTrends = showAllTrends ? matchedTrends : matchedTrends.slice(0, 12);
+  const maxTrendCount = Math.max(
+    1,
+    ...(trends.data ?? []).flatMap((trend) => [trend.early_2014_18, trend.recent_2021_25]),
   );
 
   const submit = useMutation({
@@ -70,7 +82,7 @@ export default function Pyq() {
       <PageHeader
         overline="Previous year questions · 2014–2026"
         title="PYQ Bank"
-        description="Your real 1,300-question Prelims master. Pick a year or subject, mark your option per question, and get scored against the official key with UPSC negative marking."
+        description="Practice from 1,300 verified answer-key records. Each question links to its original UPSC paper for the full stem; mark your option here and get scored with official negative marking."
       />
 
       <div className="grid gap-4 sm:grid-cols-4">
@@ -79,6 +91,86 @@ export default function Pyq() {
         <StatCard label="In this set" value={list.length} sub="ready to attempt" testId="pyq-set-stat" accent />
         <StatCard label="Marked" value={answered} sub="answers entered" testId="pyq-marked-stat" />
       </div>
+
+      <section
+        data-testid="pyq-topic-trends"
+        className="rounded-2xl border border-white/70 bg-white/65 p-5 shadow-[0_12px_36px_rgba(28,29,24,0.06)] backdrop-blur-2xl sm:p-6"
+      >
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-[#0F5B78]">
+              100-subtopic analysis · 2014–2025
+            </p>
+            <h2 className="mt-1 font-serif text-xl font-semibold text-[#1C1D18]">What UPSC returns to</h2>
+            <p className="mt-1 text-sm text-[#5E6258]">
+              Five-year topic frequency comparison. Use it to guide revision, not as a prediction.
+            </p>
+          </div>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <Input
+              data-testid="pyq-trend-search"
+              value={trendSearch}
+              onChange={(event) => setTrendSearch(event.target.value)}
+              placeholder="Find a subtopic"
+              className="w-full bg-white/70 sm:w-56"
+            />
+            <Button
+              variant="outline"
+              data-testid="pyq-trend-expand"
+              onClick={() => setShowAllTrends((visible) => !visible)}
+            >
+              {showAllTrends ? "Top 12" : "All 100"}
+            </Button>
+          </div>
+        </div>
+        {trends.isPending ? (
+          <div className="mt-5 h-32 animate-pulse rounded-xl bg-[#F0EDE5]" />
+        ) : visibleTrends.length ? (
+          <div className="mt-5 grid gap-2 sm:grid-cols-2" data-testid="pyq-trend-list">
+            {visibleTrends.map((trend) => {
+              const delta = trend.recent_2021_25 - trend.early_2014_18;
+              return (
+                <article
+                  key={trend.subtopic}
+                  data-testid="pyq-trend-row"
+                  className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-4 rounded-xl border border-white/80 bg-white/55 p-3.5"
+                >
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-medium text-[#1C1D18]">{trend.subtopic}</h3>
+                    <p className="mt-1 text-xs text-[#77796F]">
+                      {trend.all_2014_25} questions · present in {trend.years_present}/12 years
+                    </p>
+                  </div>
+                  <span className={cn("inline-flex items-center gap-0.5 self-start font-mono text-xs font-semibold", delta > 0 ? "text-[#1D4532]" : delta < 0 ? "text-[#9B4E08]" : "text-[#5E6258]")}>
+                    {delta > 0 ? <ArrowUpRight className="size-3.5" /> : <ArrowDownRight className="size-3.5" />}
+                    {delta > 0 ? "+" : ""}{delta}
+                  </span>
+                  <div className="col-span-2 mt-3 grid gap-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="w-16 shrink-0 font-mono text-[10px] text-[#77796F]">2014–18</span>
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#EDEAE3]">
+                        <div className="h-full rounded-full bg-[#8DB7B8]" style={{ width: `${(trend.early_2014_18 / maxTrendCount) * 100}%` }} />
+                      </div>
+                      <span className="w-5 text-right font-mono text-[10px] text-[#5E6258]">{trend.early_2014_18}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-16 shrink-0 font-mono text-[10px] text-[#77796F]">2021–25</span>
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#EDEAE3]">
+                        <div className="h-full rounded-full bg-[#C8640E]" style={{ width: `${(trend.recent_2021_25 / maxTrendCount) * 100}%` }} />
+                      </div>
+                      <span className="w-5 text-right font-mono text-[10px] text-[#5E6258]">{trend.recent_2021_25}</span>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-5 rounded-xl border border-dashed border-[#E8E3D7] p-6 text-center text-sm text-[#5E6258]">
+            No subtopics match that search.
+          </p>
+        )}
+      </section>
 
       <section className="flex flex-wrap items-end gap-3 rounded-2xl border border-[#E8E3D7] bg-white/70 p-5 backdrop-blur-xl">
         <div className="grid gap-1.5">
@@ -237,6 +329,18 @@ export default function Pyq() {
                     ) : null}
                   </div>
                 </button>
+                {q.official_paper_url ? (
+                  <a
+                    href={q.official_paper_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    data-testid={`pyq-source-${q.id}`}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-[#0F5B78] hover:underline"
+                    aria-label={`Open the official UPSC paper for ${q.year} question ${q.qnum}`}
+                  >
+                    Original paper <ExternalLink className="size-3" />
+                  </a>
+                ) : null}
                 <div className="flex items-center gap-1">
                   {OPTIONS.map((opt) => {
                     const selected = marks[q.id] === opt;

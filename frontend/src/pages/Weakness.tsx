@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { CardShell, EmptyState, PageHeader, StatCard } from "@/components/kit";
 import { apiPost } from "@/lib/api";
 import { errDetail, fmtMinutes } from "@/lib/format";
-import { useBurndown, useForecast, useHeatmap, useWeakness } from "@/lib/queries";
+import { useBurndown, useForecast, useHeatmap, useSubjects, useWeakness } from "@/lib/queries";
 import type { Revision } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -35,12 +35,13 @@ export default function Weakness() {
   const heat = useHeatmap();
   const burn = useBurndown();
   const forecast = useForecast();
+  const subjects = useSubjects();
 
   const queue = useMutation({
-    mutationFn: (topic: string) =>
+    mutationFn: ({ topic, subjectId }: { topic: string; subjectId: string }) =>
       apiPost<Revision>("/revisions", {
         topic,
-        subject_id: "gs1",
+        subject_id: subjectId,
         source: "Weakness radar",
       }),
     onSuccess: (r) => {
@@ -59,6 +60,32 @@ export default function Weakness() {
   }));
   const f = forecast.data;
   const weeks = heat.data ? Math.max(...heat.data.map((c) => c.week)) + 1 : 0;
+  const resolveSubjectId = (label: string) => {
+    const normalized = label.trim().toLowerCase();
+    if (!normalized) return null;
+    const direct = subjects.data?.find((subject) =>
+      [subject.id, subject.short_name, subject.name].some((name) => name.trim().toLowerCase() === normalized),
+    );
+    if (direct) return direct.id;
+    const paper = normalized.match(/\bgs[\s-]*(iv|iii|ii|i|[1-4])\b/)?.[1];
+    const paperIds: Record<string, string> = { i: "gs1", 1: "gs1", ii: "gs2", 2: "gs2", iii: "gs3", 3: "gs3", iv: "gs4", 4: "gs4" };
+    const targetId = /philosophy optional|psir|optional/.test(normalized)
+      ? "optional"
+      : /csat|aptitude/.test(normalized)
+        ? "csat"
+        : paper
+          ? paperIds[paper]
+          : /history|geograph|culture|society/.test(normalized)
+          ? "gs1"
+          : /polity|governance|social justice|international relations|\bir\b/.test(normalized)
+            ? "gs2"
+            : /economy|agri|environment|science|technology|security|disaster/.test(normalized)
+              ? "gs3"
+              : /ethics|case stud/.test(normalized)
+                ? "gs4"
+                : null;
+    return subjects.data?.find((subject) => subject.id === targetId)?.id ?? null;
+  };
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -259,49 +286,53 @@ export default function Weakness() {
       {items.length > 0 ? (
         <CardShell title="Focus list" overline="Act on these" testId="weak-list-card">
           <ul className="space-y-2" data-testid="weakness-list">
-            {items.map((i) => (
-              <li
-                key={i.topic}
-                data-testid={`weakness-item-${i.topic.replace(/\s+/g, "-").toLowerCase()}`}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#F0EDE5] px-4 py-3 transition-colors hover:bg-[#FBF9F4]"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-serif text-base font-medium text-[#1C1D18]">{i.topic}</p>
-                  <p className="text-xs text-[#5E6258]">
-                    {i.mock_hits} mock flag{i.mock_hits === 1 ? "" : "s"} · {i.pyq_wrong} PYQ wrong
-                    {i.subject ? ` · ${i.subject}` : ""}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge
-                    className={cn(
-                      "border-0 font-mono text-[10px] uppercase tracking-[0.14em]",
-                      i.severity >= 4
-                        ? "bg-[#FDF0F0] text-[#B91C1C]"
-                        : "bg-[#FEF3E2] text-[#8A3D04]",
-                    )}
-                  >
-                    {i.severity >= 4 ? <AlertTriangle className="size-3" /> : <Radar className="size-3" />}
-                    severity {i.severity}
-                  </Badge>
-                  {i.in_revision_queue ? (
-                    <Badge className="border-0 bg-[#EDF5F0] text-[#1D4532]">
-                      <ShieldCheck className="size-3" /> queued
-                    </Badge>
-                  ) : (
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      data-testid={`weakness-queue-${i.topic.replace(/\s+/g, "-").toLowerCase()}`}
-                      disabled={queue.isPending}
-                      onClick={() => queue.mutate(i.topic)}
+            {items.map((i) => {
+              const subjectId = resolveSubjectId(i.subject);
+              return (
+                <li
+                  key={`${i.subject}-${i.topic}`}
+                  data-testid={`weakness-item-${subjectId ?? "unmapped"}-${i.topic.replace(/\s+/g, "-").toLowerCase()}`}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#F0EDE5] px-4 py-3 transition-colors hover:bg-[#FBF9F4]"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-serif text-base font-medium text-[#1C1D18]">{i.topic}</p>
+                    <p className="text-xs text-[#5E6258]">
+                      {i.mock_hits} mock flag{i.mock_hits === 1 ? "" : "s"} · {i.pyq_wrong} PYQ wrong
+                      {i.subject ? ` · ${i.subject}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      className={cn(
+                        "border-0 font-mono text-[10px] uppercase tracking-[0.14em]",
+                        i.severity >= 4
+                          ? "bg-[#FDF0F0] text-[#B91C1C]"
+                          : "bg-[#FEF3E2] text-[#8A3D04]",
+                      )}
                     >
-                      <RotateCcw className="size-3.5" /> Queue revision
-                    </Button>
-                  )}
-                </div>
-              </li>
-            ))}
+                      {i.severity >= 4 ? <AlertTriangle className="size-3" /> : <Radar className="size-3" />}
+                      severity {i.severity}
+                    </Badge>
+                    {i.in_revision_queue ? (
+                      <Badge className="border-0 bg-[#EDF5F0] text-[#1D4532]">
+                        <ShieldCheck className="size-3" /> queued
+                      </Badge>
+                    ) : (
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        data-testid={`weakness-queue-${subjectId ?? "unmapped"}-${i.topic.replace(/\s+/g, "-").toLowerCase()}`}
+                        disabled={queue.isPending || !subjectId}
+                        title={subjectId ? `Queue under ${subjects.data?.find((subject) => subject.id === subjectId)?.short_name}` : "Add a clear subject tag to this mock/PYQ record before queueing."}
+                        onClick={() => subjectId && queue.mutate({ topic: i.topic, subjectId })}
+                      >
+                        <RotateCcw className="size-3.5" /> {subjectId ? "Queue revision" : "Subject needed"}
+                      </Button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </CardShell>
       ) : null}

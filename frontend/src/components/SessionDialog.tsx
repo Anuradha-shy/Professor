@@ -22,7 +22,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { apiPost } from "@/lib/api";
 import { todayISO } from "@/lib/format";
-import { useSubjects } from "@/lib/queries";
+import { useGoals, useSubjects } from "@/lib/queries";
+import { SUBJECT_AREAS } from "@/lib/subjectAreas";
 import type { StudySession } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +37,9 @@ const QUICK_MINUTES = [30, 45, 60, 90, 120, 180];
 export default function SessionDialog({ open, onOpenChange }: SessionDialogProps) {
   const qc = useQueryClient();
   const subjects = useSubjects();
+  const goals = useGoals(open);
   const [subjectId, setSubjectId] = useState("");
+  const [areaId, setAreaId] = useState("");
   const [topic, setTopic] = useState("");
   const [minutes, setMinutes] = useState("60");
   const [date, setDate] = useState(todayISO);
@@ -44,6 +47,7 @@ export default function SessionDialog({ open, onOpenChange }: SessionDialogProps
 
   const reset = () => {
     setSubjectId("");
+    setAreaId("");
     setTopic("");
     setMinutes("60");
     setDate(todayISO());
@@ -71,10 +75,15 @@ export default function SessionDialog({ open, onOpenChange }: SessionDialogProps
       toast.error(error instanceof Error ? error.message : "Could not log the session"),
   });
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && !create.isPending) reset();
+    onOpenChange(nextOpen);
+  };
+
   const valid = subjectId !== "" && topic.trim().length > 0 && Number(minutes) > 0;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="font-serif text-2xl">Log a study session</DialogTitle>
@@ -91,20 +100,36 @@ export default function SessionDialog({ open, onOpenChange }: SessionDialogProps
           className="grid gap-4"
         >
           <div className="grid gap-2">
-            <Label htmlFor="session-subject">Subject</Label>
-            <Select value={subjectId} onValueChange={(v) => setSubjectId(v)}>
+            <Label htmlFor="session-subject">Subject / focus area</Label>
+            <Select
+              value={areaId ? `area:${areaId}` : subjectId ? `paper:${subjectId}` : ""}
+              onValueChange={(value) => {
+                if (value.startsWith("area:")) {
+                  const area = SUBJECT_AREAS.find((item) => item.id === value.slice(5));
+                  if (area) {
+                    setAreaId(area.id);
+                    setSubjectId(area.subjectId);
+                  }
+                } else {
+                  setAreaId("");
+                  setSubjectId(value.slice(6));
+                }
+              }}
+            >
               <SelectTrigger data-testid="session-subject-select" className="w-full">
                 <SelectValue>
-                  {(v) =>
-                    subjects.data?.find((s) => s.id === (v as string))?.short_name ??
-                    "Choose subject"
-                  }
+                  {() => SUBJECT_AREAS.find((item) => item.id === areaId)?.name ?? subjects.data?.find((s) => s.id === subjectId)?.short_name ?? "Choose subject"}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {(subjects.data ?? []).map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
+                  <SelectItem key={s.id} value={`paper:${s.id}`}>
                     {s.name}
+                  </SelectItem>
+                ))}
+                {SUBJECT_AREAS.map((area) => (
+                  <SelectItem key={area.id} value={`area:${area.id}`}>
+                    {area.name} · {subjects.data?.find((subject) => subject.id === area.subjectId)?.short_name ?? area.subjectId}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -112,14 +137,24 @@ export default function SessionDialog({ open, onOpenChange }: SessionDialogProps
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="session-topic">Topic</Label>
+              <Label htmlFor="session-topic">Topic / syllabus goal</Label>
             <Input
               id="session-topic"
               data-testid="session-topic-input"
+                list="session-topic-suggestions"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               placeholder="e.g. Fundamental Rights — Article 21"
             />
+              <datalist id="session-topic-suggestions">
+                {[
+                  ...(subjects.data?.find((subject) => subject.id === subjectId)?.topics ?? []).map((item) => item.name),
+                  ...(goals.data ?? []).filter((goal) => goal.subject_id === subjectId).map((goal) => goal.title),
+                  ...(areaId ? [SUBJECT_AREAS.find((area) => area.id === areaId)?.name ?? ""] : []),
+                ].filter(Boolean).filter((item, index, all) => all.indexOf(item) === index).map((item) => (
+                  <option key={item} value={item} />
+                ))}
+              </datalist>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -183,7 +218,7 @@ export default function SessionDialog({ open, onOpenChange }: SessionDialogProps
               type="button"
               variant="ghost"
               data-testid="session-cancel-button"
-              onClick={() => onOpenChange(false)}
+              onClick={() => handleOpenChange(false)}
             >
               Cancel
             </Button>

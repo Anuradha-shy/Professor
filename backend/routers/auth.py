@@ -22,16 +22,24 @@ def _secret() -> str:
     return os.environ.get("APP_SECRET", "ashoka-academy-dev-secret")
 
 
+def _allow_any_device() -> bool:
+    return os.environ.get("APP_ALLOW_ANY_DEVICE", "1").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _default_unlock_value() -> str:
+    return os.environ.get("APP_PASSKEY", os.environ.get("APP_PIN", "1947")).strip()
+
+
 def _pin_hash(pin: str) -> str:
     return hashlib.sha256(f"{_secret()}:{pin}".encode()).hexdigest()
 
 
 async def _active_pin_hash() -> str:
-    """Verification hash of the active PIN: a stored override, else the env default."""
+    """Verification hash of the active local unlock value: a stored override, else the env default."""
     meta = await db.app_meta.find_one({"key": "pin"})
     if meta and meta.get("hash"):
         return meta["hash"]
-    return _pin_hash(os.environ.get("APP_PIN", "1947"))
+    return _pin_hash(_default_unlock_value())
 
 
 def create_token() -> str:
@@ -49,13 +57,23 @@ async def require_auth(tracker_session: str | None = Cookie(default=None, alias=
 
 
 async def _check_device(device_id: str, user_agent: str) -> None:
-    """Device binding: the vault trusts the first device that unlocks it.
+    """Device binding: normally the first trusted device gates the vault.
 
-    Bootstrap is idempotent — while no approved device exists yet, whichever device
-    unlocks becomes the trusted one (so a retried/duplicated request can't lock the
-    owner out of their own vault).
+    This local workspace uses a direct unlock value and auto-approves the current
+    device so stale approval records do not block access.
     """
     if not device_id:
+        return
+    if _allow_any_device():
+        now = datetime.now(timezone.utc)
+        await db.devices.update_one(
+            {"id": device_id},
+            {
+                "$set": {"label": "This device", "user_agent": user_agent, "approved": True, "last_seen": now},
+                "$setOnInsert": {"id": device_id, "created_at": now},
+            },
+            upsert=True,
+        )
         return
     now = datetime.now(timezone.utc)
     has_trusted = await db.devices.count_documents({"approved": True}) > 0
@@ -94,7 +112,8 @@ async def _check_device(device_id: str, user_agent: str) -> None:
 @router.post("/unlock", response_model=MeOut)
 async def unlock(input: UnlockIn, response: Response, request: Request) -> MeOut:
     expected = await _active_pin_hash()
-    if not hmac.compare_digest(_pin_hash(input.pin.strip()), expected):
+    candidate = (input.passkey or input.pin or "").strip()
+    if not hmac.compare_digest(_pin_hash(candidate), expected):
         raise HTTPException(status_code=401, detail="Incorrect passcode")
     await _check_device(
         (input.device_id or "").strip(), request.headers.get("user-agent", "")[:200]

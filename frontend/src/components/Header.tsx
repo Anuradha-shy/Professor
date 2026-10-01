@@ -16,9 +16,11 @@ import {
   Settings as SettingsIcon,
   Sparkles,
   Target,
+  ClipboardCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import Countdown from "@/components/Countdown";
 import SessionDialog from "@/components/SessionDialog";
 import { ChakraMark } from "@/components/kit";
 import { endSession } from "@/lib/session";
@@ -34,6 +36,7 @@ const NAV = [
   { name: "Weakness", path: "/weakness", icon: Radar, testId: "nav-weakness", tint: "#B91C1C" },
   { name: "Goals", path: "/goals", icon: Target, testId: "nav-goals", tint: "#843B62" },
   { name: "Mock Tests", path: "/tests", icon: GraduationCap, testId: "nav-tests", tint: "#0F5B78" },
+  { name: "Training G", path: "/training", icon: ClipboardCheck, testId: "nav-training", tint: "#B91C1C" },
   { name: "Syllabus", path: "/subjects", icon: BookOpen, testId: "nav-subjects", tint: "#C8640E" },
   { name: "Insights", path: "/insights", icon: LineChart, testId: "nav-insights", tint: "#1D3A2C" },
   { name: "Notion", path: "/notion", icon: Database, testId: "nav-notion", tint: "#6247AA" },
@@ -45,7 +48,7 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[#E8E3D7]/90 bg-[#FBF9F4]/85 backdrop-blur-xl">
+    <header className="glass-surface sticky top-0 z-40 border-b border-[#E8E3D7]/90 bg-[#FBF9F4]/85 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
         <Link to="/" className="flex shrink-0 items-center gap-3" data-testid="brand-link">
           <ChakraMark className="size-9" />
@@ -142,6 +145,14 @@ export default function Header() {
               </nav>
             </SheetContent>
           </Sheet>
+        </div>
+      </div>
+      <div className="border-t border-white/10 bg-[#1D3A2C] px-4 py-1.5 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+          <span className="truncate font-mono text-[10px] uppercase tracking-[0.12em] text-white/70">
+            Pressure is privileged <span className="hidden sm:inline">· Prelims 24 May 2027</span>
+          </span>
+          <Countdown compact />
         </div>
       </div>
       <SessionDialog open={logOpen} onOpenChange={setLogOpen} />

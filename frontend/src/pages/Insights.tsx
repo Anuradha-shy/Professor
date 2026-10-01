@@ -14,6 +14,9 @@ import { Badge } from "@/components/ui/badge";
 import { CardShell, PageHeader, StatCard, SubjectChip } from "@/components/kit";
 import { fmtHours, fmtMinutes } from "@/lib/format";
 import { useInsights } from "@/lib/queries";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { TrendingUp } from "lucide-react";
 
 export default function Insights() {
   const insights = useInsights();
@@ -37,6 +40,7 @@ export default function Insights() {
         overline="Intelligence"
         title="Productivity Insights"
         description="When you study, what you study, and how the effort compounds — computed fresh from your own log."
+        actions={<Button render={<Link to="/analysis" data-testid="open-exam-analysis" />} variant="outline"><TrendingUp className="size-4" /> Exam trend atlas</Button>}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

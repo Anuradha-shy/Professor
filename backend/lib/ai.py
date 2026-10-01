@@ -36,6 +36,69 @@ def _emergent_key() -> str:
     return os.environ.get("EMERGENT_LLM_KEY", "").strip()
 
 
+def _gemini_key() -> str:
+    return (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or "").strip()
+
+
+async def _gemini_generate(payload: dict) -> dict:
+    key = _gemini_key()
+    if not key:
+        raise AiUnavailable("Gemini API key is not configured")
+    model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    try:
+        async with httpx.AsyncClient(timeout=75) as client:
+            response = await client.post(url, params={"key": key}, json=payload)
+    except httpx.HTTPError as exc:
+        raise AiUnavailable(f"Gemini network error: {exc}") from exc
+    if response.is_error:
+        raise AiUnavailable(f"Gemini {response.status_code}: {response.text[:160]}")
+    return response.json()
+
+
+async def _gemini_agent(
+    messages: list[dict], system: str, tools: list[dict], dispatch: Dispatch
+) -> tuple[str, list[str]]:
+    """Gemini fallback with function calling compatible with Professor's tools."""
+    contents = [
+        {
+            "role": "model" if message.get("role") == "assistant" else "user",
+            "parts": [{"text": str(message.get("content") or "")}],
+        }
+        for message in messages
+        if message.get("role") in ("user", "assistant")
+    ]
+    payload: dict[str, Any] = {
+        "systemInstruction": {"parts": [{"text": system}]},
+        "contents": contents,
+        "generationConfig": {"temperature": 0.25, "maxOutputTokens": 1400},
+    }
+    if tools:
+        declarations = [tool.get("function", {}) for tool in tools if tool.get("type") == "function"]
+        payload["tools"] = [{"functionDeclarations": declarations}]
+        payload["toolConfig"] = {"functionCallingConfig": {"mode": "AUTO"}}
+
+    actions: list[str] = []
+    for _ in range(4):
+        data = await _gemini_generate(payload)
+        candidate = (data.get("candidates") or [{}])[0]
+        content = candidate.get("content") or {}
+        parts = content.get("parts") or []
+        calls = [part["functionCall"] for part in parts if isinstance(part, dict) and part.get("functionCall")]
+        if not calls:
+            return "\n".join(part.get("text", "") for part in parts if isinstance(part, dict)).strip(), actions
+        payload["contents"].append(content)
+        responses = []
+        for call in calls:
+            name = str(call.get("name") or "")
+            args = call.get("args") if isinstance(call.get("args"), dict) else {}
+            result = await dispatch(name, args)
+            actions.append(f"{name}:{'ok' if result.get('ok') else 'failed'}")
+            responses.append({"functionResponse": {"name": name, "response": result}})
+        payload["contents"].append({"role": "user", "parts": responses})
+    return "", actions
+
+
 async def _mistral(payload: dict, attempts: int = 3) -> dict:
     key = _mistral_key()
     if not key:
@@ -154,11 +217,18 @@ async def agent_turn(
         return reply, actions, f"mistral:{TEXT_MODEL}"
     except AiUnavailable as exc:
         logger.warning("Mistral unavailable (%s) — falling back", exc)
+    try:
+        reply, actions = await _gemini_agent(messages, system, tools, dispatch)
+        return reply, actions, f"gemini:{os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')}"
+    except AiUnavailable as exc:
+        logger.warning("Gemini unavailable (%s) — using configured universal fallback", exc)
         reply, actions = await _fallback_agent(messages, system, tools, dispatch)
         return reply, actions, f"fallback:{FALLBACK_MODEL}"
 
 
-async def vision_completion(image_bytes: bytes, prompt: str, system: str) -> tuple[str, str]:
+async def vision_completion(
+    image_bytes: bytes, prompt: str, system: str, mime_type: str = "image/jpeg"
+) -> tuple[str, str]:
     """OMR / image evaluation with the same fallback guarantee."""
     b64 = base64.b64encode(image_bytes).decode()
     payload = {
@@ -169,7 +239,7 @@ async def vision_completion(image_bytes: bytes, prompt: str, system: str) -> tup
                 "role": "user",
                 "content": [
                     {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": f"data:image/jpeg;base64,{b64}"},
+                    {"type": "image_url", "image_url": f"data:{mime_type};base64,{b64}"},
                 ],
             },
         ],
@@ -180,7 +250,26 @@ async def vision_completion(image_bytes: bytes, prompt: str, system: str) -> tup
         data = await _mistral(payload, attempts=2)
         return data["choices"][0]["message"].get("content") or "", f"mistral:{VISION_MODEL}"
     except AiUnavailable as exc:
-        logger.warning("Mistral vision unavailable (%s) — falling back", exc)
+        logger.warning("Mistral vision unavailable (%s) — trying Gemini", exc)
+    try:
+        data = await _gemini_generate(
+            {
+                "systemInstruction": {"parts": [{"text": system}]},
+                "contents": [{
+                    "role": "user",
+                    "parts": [
+                        {"text": prompt},
+                        {"inlineData": {"mimeType": mime_type, "data": b64}},
+                    ],
+                }],
+                "generationConfig": {"temperature": 0.1, "maxOutputTokens": 1600},
+            }
+        )
+        parts = ((data.get("candidates") or [{}])[0].get("content") or {}).get("parts") or []
+        text = "\n".join(part.get("text", "") for part in parts if isinstance(part, dict)).strip()
+        return text, f"gemini:{os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')}"
+    except AiUnavailable as exc:
+        logger.warning("Gemini vision unavailable (%s) — using configured universal fallback", exc)
         key = _emergent_key()
         if not key:
             raise

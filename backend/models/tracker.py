@@ -17,7 +17,8 @@ def _now() -> datetime:
 
 # --- auth (PIN gate) ---
 class UnlockIn(BaseModel):
-    pin: str
+    pin: str | None = None
+    passkey: str | None = None
     device_id: str | None = None
 
 
@@ -239,6 +240,7 @@ class PyqQuestion(BaseModel):
     current_affairs: bool = False
     answer: str = ""
     cancelled: bool = False
+    official_paper_url: str = ""
 
 
 class PyqQuestionDetail(PyqQuestion):
@@ -280,6 +282,14 @@ class PyqMeta(BaseModel):
     per_year: dict[str, int]
     per_subject: dict[str, int]
     difficulties: list[str]
+
+
+class PyqTopicTrend(BaseModel):
+    subtopic: str
+    all_2014_25: int
+    years_present: int
+    early_2014_18: float
+    recent_2021_25: float
 
 
 class PyqResultItem(BaseModel):
@@ -393,11 +403,14 @@ class AiSession(BaseModel):
 
 
 class OmrResultOut(BaseModel):
+    id: str = ""
     label: str
     provider: str
     detected: dict[str, str] = Field(default_factory=dict)
+    answer_key: dict[str, str] = Field(default_factory=dict)
     detected_count: int = 0
     evaluated: bool = False
+    reviewed: bool = False
     correct: int = 0
     wrong: int = 0
     blank: int = 0
@@ -406,6 +419,11 @@ class OmrResultOut(BaseModel):
     accuracy: float = 0.0
     notes: str = ""
     date: str
+
+
+class OmrReviewIn(BaseModel):
+    answers: dict[str, str]
+    answer_key: str = ""
 
 
 # --- devices ---
@@ -467,8 +485,21 @@ class NotionEntry(BaseModel):
     pyq_history: str = ""
     last_updated: str = ""
     images: list[dict] = Field(default_factory=list)
+    content: list[str] = Field(default_factory=list)
     last_edited_time: str = ""
     values: dict = Field(default_factory=dict)
+
+
+class NotionContentBlock(BaseModel):
+    type: str
+    text: str
+    depth: int = 0
+
+
+class NotionPageContent(BaseModel):
+    content: list[str] = Field(default_factory=list)
+    blocks: list[NotionContentBlock] = Field(default_factory=list)
+    images: list[dict] = Field(default_factory=list)
 
 
 class NotionEntryUpdate(BaseModel):

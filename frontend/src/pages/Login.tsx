@@ -26,11 +26,10 @@ export default function Login() {
     retry: false,
     staleTime: Infinity,
   });
-  if (me.isSuccess) return <Navigate to="/" replace />;
 
   const unlock = useMutation({
     mutationFn: (value: string) =>
-      apiPost<MeOut>("/auth/unlock", { pin: value, device_id: deviceId() }),
+      apiPost<MeOut>("/auth/unlock", { pin: value, passkey: value, device_id: deviceId() }),
     onSuccess: () => {
       beginSession();
       navigate("/", { replace: true });
@@ -46,6 +45,8 @@ export default function Login() {
       toast.error(detail ?? "Incorrect password — try again");
     },
   });
+
+  if (me.isSuccess) return <Navigate to="/" replace />;
 
   return (
     <div className="relative flex min-h-svh items-center justify-center overflow-hidden bg-[#FBF9F4] px-4">
@@ -67,7 +68,7 @@ export default function Login() {
               Device-bound vault · UPSC CSE 2027
             </p>
             <p className="mt-3 text-sm leading-relaxed text-[#5E6258]">
-              Enter your password to unlock your study command centre.
+              Enter your local passcode to unlock your study command centre.
             </p>
           </div>
 
@@ -112,7 +113,7 @@ export default function Login() {
           </form>
 
           <p className="mt-4 text-center text-xs text-[#8B8F83]">
-            Private to your trusted device · change the password in Settings
+            Private to your trusted device · local unlock value
           </p>
         </div>
       </main>

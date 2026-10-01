@@ -25,7 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { EmptyState, PageHeader, SubjectChip } from "@/components/kit";
 import { apiDelete, apiPatch, apiPost } from "@/lib/api";
 import { PRIORITY_LABELS, errDetail, fmtDate, todayISO } from "@/lib/format";
-import { useGoals, useSubjects } from "@/lib/queries";
+import { useGoals, useSessions, useSubjects } from "@/lib/queries";
 import type { Goal } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -35,10 +35,50 @@ const PRIORITY_STYLES: Record<string, string> = {
   low: "bg-[#F6F2E9] text-[#5E6258]",
 };
 
+const GOAL_PRESETS = [
+  {
+    title: "Prelims PYQ cycle · GS-I",
+    description: "Attempt and review one previous-year GS-I set; add missed topics to revision.",
+    subjectId: "gs1",
+    days: 7,
+  },
+  {
+    title: "Prelims CSAT timed practice",
+    description: "Complete two timed CSAT sets and review accuracy and time spent.",
+    subjectId: "csat",
+    days: 7,
+  },
+  {
+    title: "Mains answer-writing · Governance & Social Justice",
+    description: "Write and self-review ten GS-II answers on governance, social justice, and constitutional institutions.",
+    subjectId: "gs2",
+    days: 7,
+  },
+  {
+    title: "Prelims + Mains cycle · Agriculture & Internal Security",
+    description: "Revise agriculture, food security, cyber security, and internal security with PYQs and two mains answers.",
+    subjectId: "gs3",
+    days: 10,
+  },
+  {
+    title: "Mains ethics case-study practice",
+    description: "Complete five GS-IV case studies and revise the ethical frameworks used.",
+    subjectId: "gs4",
+    days: 10,
+  },
+  {
+    title: "Philosophy optional · Paper I & II answer cycle",
+    description: "Write timed answers on one Western and one Indian philosophy topic each study day.",
+    subjectId: "optional",
+    days: 14,
+  },
+];
+
 export default function Goals() {
   const qc = useQueryClient();
   const goals = useGoals();
   const subjects = useSubjects();
+  const sessions = useSessions(10_000);
   const [createOpen, setCreateOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -53,14 +93,20 @@ export default function Goals() {
   };
 
   const create = useMutation({
-    mutationFn: () =>
+    mutationFn: (preset?: (typeof GOAL_PRESETS)[number]) =>
       apiPost<Goal>("/goals", {
-        title: title.trim(),
-        description: description.trim(),
-        subject_id: subjectId === "none" ? null : subjectId,
-        priority,
-        target_date: targetDate,
-        progress: Number(progress) || 0,
+        title: preset?.title ?? title.trim(),
+        description: preset?.description ?? description.trim(),
+        subject_id: preset
+          ? subjects.data?.find((subject) => subject.id === preset.subjectId)?.id ?? null
+          : subjectId === "none"
+            ? null
+            : subjectId,
+        priority: preset ? "high" : priority,
+        target_date: preset
+          ? new Date(Date.now() + preset.days * 86400000).toISOString().slice(0, 10)
+          : targetDate,
+        progress: preset ? 0 : Number(progress) || 0,
       }),
     onSuccess: (goal) => {
       toast.success(`Goal “${goal.title}” created`);
@@ -108,6 +154,15 @@ export default function Goals() {
     onError: (error) => toast.error(errDetail(error)),
   });
 
+  const roadmap = useMutation({
+    mutationFn: () => apiPost<Goal[]>("/goals/syllabus-roadmap"),
+    onSuccess: (created) => {
+      toast.success(created.length ? `Created ${created.length} syllabus goals` : "Syllabus roadmap is already up to date");
+      invalidate();
+    },
+    onError: (error) => toast.error(errDetail(error)),
+  });
+
   const list = goals.data ?? [];
   const today = todayISO();
 
@@ -118,15 +173,46 @@ export default function Goals() {
         title="Goals & Roadmap"
         description="Strategic targets across GS papers, optional and prelims — nudge progress as you climb."
         actions={
-          <Button
-            data-testid="create-goal-btn"
-            onClick={() => setCreateOpen(true)}
-            className="bg-[#C8640E] text-white hover:bg-[#A85309]"
-          >
-            <Plus className="size-4" /> New goal
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" data-testid="create-syllabus-roadmap-btn" disabled={roadmap.isPending || !subjects.data?.length} onClick={() => roadmap.mutate()}>
+              <Target className="size-4" /> {roadmap.isPending ? "Building…" : "Build syllabus roadmap"}
+            </Button>
+            <Button
+              data-testid="create-goal-btn"
+              onClick={() => setCreateOpen(true)}
+              className="bg-[#C8640E] text-white hover:bg-[#A85309]"
+            >
+              <Plus className="size-4" /> New goal
+            </Button>
+          </div>
         }
       />
+
+      <section className="glass-surface rounded-2xl border border-white/70 bg-white/65 p-5 shadow-[0_12px_36px_rgba(28,29,24,0.06)] backdrop-blur-2xl sm:p-6">
+        <div className="mb-4">
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-[#0F5B78]">
+            Prelims + Mains
+          </p>
+          <h2 className="mt-1 font-serif text-xl font-semibold text-[#1C1D18]">Start a focused cycle</h2>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {GOAL_PRESETS.map((preset) => (
+            <article key={preset.title} className="flex flex-col rounded-xl border border-white/80 bg-white/55 p-4">
+              <h3 className="font-medium text-[#1C1D18]">{preset.title}</h3>
+              <p className="mt-1 flex-1 text-xs leading-relaxed text-[#5E6258]">{preset.description}</p>
+              <Button
+                size="sm"
+                data-testid={`goal-preset-${preset.subjectId}`}
+                disabled={create.isPending || !subjects.data}
+                onClick={() => create.mutate(preset)}
+                className="mt-3 bg-[#1D3A2C] text-white hover:bg-[#2F5E48]"
+              >
+                <Plus className="size-3.5" /> Add {preset.days}-day goal
+              </Button>
+            </article>
+          ))}
+        </div>
+      </section>
 
       {goals.isPending ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="goals-skeleton">
@@ -153,6 +239,7 @@ export default function Goals() {
           {list.map((g) => {
             const overdue = g.status === "active" && g.target_date < today;
             const subject = subjects.data?.find((s) => s.id === g.subject_id);
+            const timerMinutes = (sessions.data ?? []).filter((session) => session.subject_id === g.subject_id && session.topic === g.title).reduce((total, session) => total + session.duration_minutes, 0);
             return (
               <article
                 key={g.id}
@@ -194,6 +281,7 @@ export default function Goals() {
                   </span>
                   {subject ? <SubjectChip short={subject.short_name} color={subject.color} /> : null}
                 </div>
+                {timerMinutes > 0 ? <p className="mt-2 font-mono text-[11px] text-[#0F5B78]">Live timer · {Math.floor(timerMinutes / 60)}h {timerMinutes % 60}m logged on this exact topic</p> : null}
                 <div className="mt-4">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-mono font-medium uppercase tracking-[0.14em] text-[#8C6212]">
@@ -268,7 +356,7 @@ export default function Goals() {
             data-testid="goal-form"
             onSubmit={(e) => {
               e.preventDefault();
-              if (title.trim()) create.mutate();
+              if (title.trim()) create.mutate(undefined);
             }}
             className="grid gap-4"
           >
